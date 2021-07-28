@@ -1,0 +1,83 @@
+<!DOCTYPE HTML>
+<html>
+   <head>
+   <meta charset="utf-8">
+   <title>自动驾驶websocket测试</title>
+
+<script type="text/javascript">
+   function WebSocketTest()
+   {
+      if ("WebSocket" in window)
+      {
+         // alert("您的浏览器支持 WebSocket!");
+
+         // 打开一个 web socket
+         ws = new WebSocket('ws://' + window.location.host + '/ws/test/');
+         ws.onopen = function()
+         {
+            // Web Socket 已连接上，使用 send() 方法发送数据
+            ws.send('{"message": "测试数据"}');
+            alert("数据发送中...");
+         };
+
+         ws.onmessage = function (evt)
+         {
+            var info = JSON.parse(evt.data);
+
+            //alert("数据已接收...");
+            alert("数据已接收:"+info.message)
+         };
+
+         ws.onclose = function()
+         {
+            // 关闭 websocket
+            alert("连接已关闭...");
+         };
+      }
+      else
+      {
+         // 浏览器不支持 WebSocket
+         alert("您的浏览器不支持 WebSocket!");
+      }
+   }
+</script>
+
+   </head>
+   <body>
+      <div id="sse">
+         <a href="javascript:WebSocketTest()">运行 WebSocket</a>
+      </div>
+      <div>
+         <textarea id="chat_log" rows="10" cols="30"></textarea>
+      </div>
+      <div>
+         <input type="text" id="sendMsgText" width=""/>
+         <button onclick="sendMsg()">发送</button>
+      </div>
+
+   </body>
+
+<script>
+   g_ws = new WebSocket('ws://' + window.location.host + '/autodrive/test/');
+<!--   alert('ws://' + window.location.host + '/ws/test/')-->
+   g_ws.onopen = function()
+   {
+      g_ws.send('{"message": "测试数据"}');
+      //alert("已连接上");
+   };
+   g_ws.onmessage = function(evt)
+   {
+      //alert("接收");
+      var info = JSON.parse(evt.data);
+      document.querySelector('#chat_log').value += (info.message + '\n');
+   };
+
+   function sendMsg()
+   {
+      var message = sendMsgText.value  // id.value
+      json = JSON.stringify({"message": message})
+      g_ws.send(json);
+      //alert("发送");
+   }
+</script>
+</html>

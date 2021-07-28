@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/html">
+<head>
+    <meta charset="UTF-8">
+    <title>自动驾驶控制系统</title>
+</head>
+<body>
+    开发中...
+    <div>
+        用户id: <input id="user_id" type="number"> <button onclick="connect()">连接</button>
+    </div> </br>
+    <div>
+         <textarea type="text" id="car_state" rows="30" cols="100"></textarea>
+    </div>
+
+<script>
+    var g_ws;
+
+    function connect(){
+<!--        asert(user_id.innerHTML)-->
+        g_ws = new WebSocket('ws://' + window.location.host + '/autodrive/user/core/');
+        g_ws.onopen = function()
+        {
+            data = JSON.stringify({"user_id": user_id.value})
+            g_ws.send(data)
+        };
+        g_ws.onmessage = function(evt)
+        {
+          //alert("接收");
+          var info = JSON.parse(evt.data);
+          // info.car_id
+          // info.car_state
+          document.querySelector('#car_state').value += (evt.data + '\n');
+          car_state.scrollTop = car_state.scrollHeight;
+        };
+
+       function sendMsg()
+       {
+    <!--      var message = sendMsgText.value  // id.value-->
+    <!--      json = JSON.stringify({"message": message})-->
+    <!--      g_ws.send(json);-->
+       }
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<h1>这是测试页</h1>
+<br/>
+<img src="/static/images/1.jpeg" width="400px" height="200px"/>
+<div class="status-info-content txt-center" id="statusWanInfo">
+<div class="status-info-content-station">
+    <div class="status-info-text">
+        <span><img src="/static/images/upspeed.png"></span>
+        <span id="statusUploadSpeed"></span>
+        <span>&nbsp;</span>
+        <span style="color: #e2e2e2;">|</span>
+        <span>&nbsp;</span>
+        <span><img src="/static/images/downspeed.png"></span>
+        <span id="statusDownloadSpeed"></span>
+    </div>
+    <div class="status-info-text none">
+        <span>--</span>
+    </div>
+    <span class="status-info-tips">Current Speed</span>
+</div>
+</div>
+
+<h2 id="h2">这是h2</h2>
+<button type="button" onclick="buttonClicked()">Click Me!</button>
+<div class="vehicleState">
+    <span>车速:</span> <span id="vehicleSpeed">0.0</span> km/h</br>
+    <span>状态:</span> <span id="vehicleStatus"></span></br>
+    <span>电量:</span> <span id="vehicleBattery"></span></br>
+    <span>运行时间:</span> <span id="runTime">0</span> s</br>
+    <span>请求成功:</span> <span id="requestOK">0</span> 次</br>
+</div>
+</br>
+
+<div id="newDiv">
+
+
+</div>
+
+<script type="text/javascript">
+    function buttonClicked(){
+        document.getElementById('h2').innerHTML = "this is h2";
+    }
+
+    //速度转换单位
+    function translateSpeed(speedMs) {
+        if (Number(speedMs) < 10) {
+            return Number(speedMs).toFixed(1) + "m/s";
+        } else {
+            return (speedMs * 3.6).toFixed(1) + "km/h";
+        }
+    }
+
+    var runTime = 0;
+    var requestOK = 0;
+    function clock_1s(){
+        runTime = runTime + 1;
+        // $('#runTime span').html("runTime");
+        document.getElementById('runTime').innerHTML = runTime;
+
+        var xmlhttp;
+        if (window.XMLHttpRequest)
+        {// code for IE7+, Firefox, Chrome, Opera, Safari
+          xmlhttp=new XMLHttpRequest();
+        }
+        else
+        {// code for IE6, IE5
+          xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
+        }
+        xmlhttp.onreadystatechange=function(){
+            if (xmlhttp.readyState==4 && xmlhttp.status==200){
+                requestOK = requestOK + 1;
+                document.getElementById("requestOK").innerHTML = requestOK; //xmlhttp.responseText;
+                var vehicleState = JSON.parse(xmlhttp.responseText);
+
+                document.getElementById("vehicleSpeed").innerHTML = vehicleState.speed;
+                document.getElementById("vehicleBattery").innerHTML = vehicleState.battery*100 + "%";
+            }
+        }
+        xmlhttp.open("GET","/vehicleState",true);
+        xmlhttp.send();
+
+    }
+
+    var clock1 = self.setInterval("clock_1s()",1000);
+
+    // 页面加载完毕后将调用此函数
+    window.onload = function () {
+        document.getElementById("statusUploadSpeed").innerHTML="10m/s";
+        document.getElementById("statusDownloadSpeed").innerHTML="8m/s";
+
+    }
+</script>
+</body>
+</html>

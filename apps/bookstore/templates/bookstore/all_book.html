@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/html">
+<head>
+    <meta charset="UTF-8">
+    <title>查看所有书籍</title>
+</head>
+<body>
+
+<div class="bookFilter">
+    <form method="post" action="/bookstore/all_book/">
+        书名: <input type="text" name="title" value="{{ filterInfo.title }}" id="filterTitle"/> <br/>
+        价格区间: <input type="number" min="0.0" name="minPrice" value="{{ filterInfo.minPrice }}" id="filterMinPrice"/>-
+                <input type="number" min="0.0" name="maxPrice" value="{{ filterInfo.maxPrice }}" id="filterMaxPrice"/></br>
+
+        <button type="button" id="clearBtn1" onclick="clearFilter()">清空1</button>
+        <button type="button" id="clearBtn2" onclick="filterMinPrice.value=''">清空2</button>
+        <input type="submit" value="筛选">
+    </form>
+</div>
+<script>
+    function clearFilter(){
+        filterTitle.value='';
+        filterMinPrice.value='';
+        filterMaxPrice.value='';
+    }
+</script>
+
+
+<a href="/bookstore/add_book">添加书目</a>
+</br>
+
+<table border="1">
+  <tr>
+    <th>id</th>
+    <th>title</th>
+    <th>pub</th>
+    <th>price</th>
+    <th>market_price</th>
+    <th>op</th>
+  </tr>
+  {% for book in all_book %}
+    <tr>
+        <td>{{ book.id }}</td>>
+        <td>{{ book.title }}</td>
+        <td>{{ book.pub }}</td>
+        <td>{{ book.price }}</td>
+        <td>{{ book.market_price }}</td>
+        <td>
+            <a href="/bookstore/update_book/{{ book.id }}">更新</a>
+            <a href="/bookstore/delete_book?book_id={{ book.id }}">删除</a>
+        </td>
+
+  {% endfor %}
+
+
+
+</table>
+
+</body>
+</html>

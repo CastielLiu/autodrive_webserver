@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>添加书目</title>
+</head>
+<body>
+<form action="/bookstore/add_book/" method="post">
+  <p>
+    title <input type="text" name="title" required="required"/>
+  </p>
+  <p>
+    pub <input type="text" name="pub" required="required"/>
+  </p>
+  <p>
+    price <input type="number" min="0" max="1000" step="0.01"  name="price" required="required"/>
+  </p>
+  <p>
+    <!--    需要修改的字段需要name值, 否则浏览器不会提交 -->
+    <!--    提交的值将通过request.body传递 price=xx&market_price=xx-->
+    market_price <input type="number" min="0" max="1000" step="0.01"  name="market_price" required="required"/>
+  </p>
+  <p>
+    <input type="submit" value="添加">
+  </p>
+</form>
+</body>
+</html>
