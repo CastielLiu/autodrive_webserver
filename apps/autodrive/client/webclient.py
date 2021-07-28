@@ -1,7 +1,7 @@
 # 远程用户客户端
 # 当前开发针对web端客户
 
-from .user import Client
+from .client import Client
 
 
 # 用户控制指令

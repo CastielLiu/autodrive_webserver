@@ -5,41 +5,65 @@
     <title>自动驾驶控制系统</title>
 </head>
 <body>
-    开发中...
     <div>
-        用户id: <input id="user_id" type="number"> <button onclick="connect()">连接</button>
+        用户名: <input id="username" type="text"> 密码: <input id="password" type="password">
+        <button id="connectBtn" onclick="connect()" name="connect">连接</button>
     </div> </br>
     <div>
-         <textarea type="text" id="car_state" rows="30" cols="100"></textarea>
+         <textarea type="text" id="car_state" rows="30" cols="180"></textarea>
     </div>
 
 <script>
     var g_ws;
+    var g_ws_login = 0;
 
     function connect(){
-<!--        asert(user_id.innerHTML)-->
-        g_ws = new WebSocket('ws://' + window.location.host + '/autodrive/user/core/');
-        g_ws.onopen = function()
-        {
-            data = JSON.stringify({"user_id": user_id.value})
-            g_ws.send(data)
-        };
-        g_ws.onmessage = function(evt)
-        {
-          //alert("接收");
-          var info = JSON.parse(evt.data);
-          // info.car_id
-          // info.car_state
-          document.querySelector('#car_state').value += (evt.data + '\n');
-          car_state.scrollTop = car_state.scrollHeight;
-        };
+        // asert(user_id.innerHTML)
+        if(connectBtn.name == "connect"){
+            g_ws = new WebSocket('ws://' + window.location.host + '/autodrive/web/core/');
 
-       function sendMsg()
-       {
-    <!--      var message = sendMsgText.value  // id.value-->
-    <!--      json = JSON.stringify({"message": message})-->
-    <!--      g_ws.send(json);-->
-       }
+            g_ws.onopen = function(){
+                data = JSON.stringify({"user_id": username.value, "password": password.value})
+                g_ws.send(data)
+            };
+
+            g_ws.onmessage = function(evt){
+              var info = JSON.parse(evt.data);
+
+              // 登录反馈
+              if(g_ws_login==0 && info['login']){
+                g_ws_login = 1;
+                connectBtn.name = "disconnect";
+                connectBtn.innerHTML = "断开"
+                return;
+              }
+
+              // 状态数据
+              // info.car_id
+              // info.car_state
+              document.querySelector('#car_state').value += (evt.data + '\n');
+              car_state.scrollTop = car_state.scrollHeight;
+            };
+
+            g_ws.onclose = function(evt){
+                connectBtn.name = "connect";
+                connectBtn.innerHTML = "连接";
+            }
+
+
+           function sendMsg()
+           {
+              //var message = sendMsgText.value  // id.value
+              //json = JSON.stringify({"message": message})
+              //g_ws.send(json);
+           }
+        }
+        else{
+            connectBtn.name = "connect";
+            connectBtn.innerHTML = "连接";
+            g_ws.close();
+            g_ws_login = 0;
+        }
     }
 </script>
 </body>

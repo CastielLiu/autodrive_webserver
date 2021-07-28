@@ -1,7 +1,7 @@
 # 车辆客户端
 import json
 
-from .user import Client
+from .client import Client
 
 
 # 车辆状态
