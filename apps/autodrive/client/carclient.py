@@ -31,12 +31,12 @@ class CarState:
 
 # 车辆客户端
 class CarClient(Client):
-    def __init__(self, car_id, ws):
-        Client.__init__(self, car_id, ws)
+    def __init__(self, car_id, car_name, ws):
+        Client.__init__(self, "car", car_id, car_name, ws)
         self.state = CarState()
 
     # 获取车辆实时数据
-    def reltimedata(self):
+    def reltimedata(self, attrs):
         d = dict()
         d['car_id'] = self.id
         d['car_state'] = self.state.data()

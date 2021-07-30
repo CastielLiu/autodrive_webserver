@@ -13,6 +13,6 @@ class UserCtrl:
 
 # 用户客户端
 class UserClient(Client):
-    def __init__(self, user_id, ws):
-        Client.__init__(self, user_id, ws)
+    def __init__(self, user_id, user_name, ws):
+        Client.__init__(self, "web", user_id, user_name, ws)
         self.ctrl_cmd = UserCtrl()

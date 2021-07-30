@@ -1,70 +1,158 @@
 <!DOCTYPE html>
-<html lang="en" xmlns="http://www.w3.org/1999/html">
+<html lang="en" xmlns="http://www.w3.org/1999/html" xmlns="http://www.w3.org/1999/html">
 <head>
     <meta charset="UTF-8">
     <title>自动驾驶控制系统</title>
 </head>
 <body>
     <div>
-        用户名: <input id="username" type="text"> 密码: <input id="password" type="password">
+        用户名: <input id="username" type="text" value="wendao" required="required">
+        密码: <input id="password" type="password" value="wendao" required="required">
         <button id="connectBtn" onclick="connect()" name="connect">连接</button>
+        <i id="loginInfo"></i>
+
     </div> </br>
     <div>
-         <textarea type="text" id="car_state" rows="30" cols="180"></textarea>
+        数据接收:</br>
+        <textarea type="text" id="car_state" rows="30" cols="180"></textarea></br></br>
+        数据发送:</br>
+        <textarea type="text" id="log" rows="10" cols="180"></textarea>
+    </div>
+
+    <div>
+        在线车辆:
+        <div id="onlineCars"/>
     </div>
 
 <script>
     var g_ws;
     var g_ws_login = 0;
 
-    function connect(){
-        // asert(user_id.innerHTML)
-        if(connectBtn.name == "connect"){
-            g_ws = new WebSocket('ws://' + window.location.host + '/autodrive/web/core/');
+    // 调试显示
+    function log(str_msg){
+        document.querySelector('#car_state').value += (str_msg + '\n');
+        car_state.scrollTop = car_state.scrollHeight;
+    }
 
-            g_ws.onopen = function(){
-                data = JSON.stringify({"user_id": username.value, "password": password.value})
+    function core_ws(){
+        g_ws = new WebSocket('ws://' + window.location.host + '/autodrive/web/core/');
+        g_ws.onopen = function(){
+            if(username.value == "" || password.value == "")
+                loginInfo.innerHTML = "请输入帐号或密码";
+            else{
+                data = JSON.stringify({"type": "req_login", "msg": {"user_id": username.value, "password": password.value}})
+                log.value += (data + "\r\n");
                 g_ws.send(data)
-            };
+            }
+        };
 
-            g_ws.onmessage = function(evt){
-              var info = JSON.parse(evt.data);
+        g_ws.onmessage = function(evt){
+          var data, type, msg;
+          try{ //json解析 异常捕获
+            data = JSON.parse(evt.data);
+            type = data.type;
+            msg = data.msg;
+            if(typeof(type) == "undefined")
+                return;
+          }catch(err){
+            return;
+          }
 
-              // 登录反馈
-              if(g_ws_login==0 && info['login']){
+          log(JSON.stringify(data))
+
+          // 登录反馈
+          if(g_ws_login==0 && type=="res_login"){
+            if(msg.result){ // 登录成功
                 g_ws_login = 1;
                 connectBtn.name = "disconnect";
-                connectBtn.innerHTML = "断开"
+                connectBtn.innerHTML = "断开";
+                loginInfo.innerHTML = "登录成功";
+                getOnlineCars();
                 return;
-              }
-
+            }
+            else
+                loginInfo.innerHTML = "帐号或密码错误";
+          }
+          else if(type == "rep_car_state"){
               // 状态数据
-              // info.car_id
+              // info.id
               // info.car_state
-              document.querySelector('#car_state').value += (evt.data + '\n');
-              car_state.scrollTop = car_state.scrollHeight;
-            };
+          }
+          else if(type == "res_online_car"){
+            showOnlineCars(msg.cars)
+          }
+        }
 
-            g_ws.onclose = function(evt){
+        g_ws.onclose = function(evt){
+            if(g_ws_login)
+            {
                 connectBtn.name = "connect";
                 connectBtn.innerHTML = "连接";
+                g_ws_login = 0;
+                loginInfo.innerHTML = "";
             }
-
-
-           function sendMsg()
-           {
-              //var message = sendMsgText.value  // id.value
-              //json = JSON.stringify({"message": message})
-              //g_ws.send(json);
-           }
         }
-        else{
+    }
+
+    function connect(){
+        // asert(user_id.innerHTML)
+        loginInfo.innerHTML = "";
+        if(connectBtn.name == "connect"){
+            core_ws()
+        }else{
             connectBtn.name = "connect";
             connectBtn.innerHTML = "连接";
             g_ws.close();
             g_ws_login = 0;
         }
     }
+
+    function getOnlineCars(){
+        type = "req_online_car";
+        var request = {"type": type};
+        g_ws.send(JSON.stringify(request));
+    }
+
+    function requestListenCars(car_id){
+        var type = "req_listen_car";
+        var listen_car1 = {"id": "seu_ant", "attr":['speed','steer_angle']};
+        var listen_car2 = {"id": "seu_ant1", "attr":['a1','b1']};
+        var listen_cars = {"cars": [listen_car1, listen_car2]};
+        var request = {"type": type, "msg": listen_cars};
+        g_ws.send(JSON.stringify(request));
+        //{"type":"request_car_info","msg":{"cars":[{"id":"xx","attr":["a","b"]},{"id":"xxx","attr":["a1","b1"]}]}}
+    }
+
+    function showOnlineCars(cars){
+        var tab="<table border='1'>";
+        tab+="<tr><th>车辆ID</th><th>车辆名称</th><th>显示状态</th></tr>"
+
+        for(var i in cars){
+            tab+=("<tr><td>" + cars[i].id + "</td><td>" + cars[i].name + "</td><td>"
+                +"<input type='checkbox' " +"name=" + cars[i].id + " onchange='showDataCheck(this)'>显示状态"+"</td></tr>")
+        }
+        tab+="</table>";
+        var divv=document.getElementById("onlineCars");
+        divv.innerHTML=tab;
+    }
+
+    function showDataCheck(obj){
+        var type = "req_listen_car";
+        var car_id = obj.name;
+        var listen_car1 = {"id": car_id, "attr":[''], "f": 1};
+        var listen_cars = {"cars": [listen_car1, ]};
+        var request = {"type": type, "msg": listen_cars};
+        if(obj.checked){
+            listen_car1["attr"] = ['speed', 'steer_angle'];
+            listen_car1["f"] = 10;
+        }
+        else{
+            listen_car1["attr"] = [''];
+        }
+        log(JSON.stringify(request));
+        g_ws.send(JSON.stringify(request));
+    }
+
 </script>
 </body>
 </html>

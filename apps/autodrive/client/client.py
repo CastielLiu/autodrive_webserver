@@ -1,36 +1,24 @@
 # 客户端
 from django.db.models import Q, F
+from random import Random
+import string
 
 
-# 用户登录, 使用user_id/user_name + password进行登录验证
-# database: 用户数据库
-# data_json: 用户请求登录数据
-def login(database, data_json):
-    user_id = data_json.get("user_id", None)
-    user_name = data_json.get("user_name", None)
-    password = data_json.get("password", None)
-
-    # 登录信息不完全
-    if (user_name is None and user_id is None) or password is None:
-        return False, "错误请求", None
-
-    users = database.objects.all()
-    for user in users:
-        print(user.password, user.userid, user.username)
-
-    try:
-        # 使用Q对象筛选用户, 查找username或userid匹配的用户
-        user = database.objects.get(Q(username=user_name) | Q(userid=user_id) & Q(is_active=True))
-    except Exception as e:
-        return False, "用户不存在", None
-
-    if user.password != password:
-        return False, "密码错误", None
-    return True, "登录成功", user.userid
+# 生成随机令牌, 用户登录验证成功后生成, 其退出之前再发起新的web请求, 可携带此token以通过新验证
+# 此项目中, 拟定同一用户可发起多个web连接, 首先经core进行登录验证,验证成功后系统生成token并发放给用户
+# 用户退出登录之前发起新的web连接时, 利用用户名和token进行验证(如何避免用户名和token被非法获得)
+def randomToken(token_len=10):
+    token = ''
+    chars = string.ascii_letters + string.digits
+    for i in range(token_len):
+        token += chars[Random().randint(0, len(chars) - 1)]
+    return token
 
 
 class Client:
-    def __init__(self, _id, _ws):
-        self.id = _id  # 客户端id
+    def __init__(self, _type, _id, _name, _ws):
+        self.type = _type  # 客户端用户类型
+        self.id = _id  # 客户端用户id
         self.ws = _ws  # 客户端websocket
-        self.name = ""  # 客户端名称
+        self.name = _name  # 客户端用户名称
+        self.token = randomToken()

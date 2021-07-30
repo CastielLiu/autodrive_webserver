@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <module type="PYTHON_MODULE" version="4">
   <component name="NewModuleRootManager">
-    <content url="file://$MODULE_DIR$/../autodrive_webserver">
-      <sourceFolder url="file://$MODULE_DIR$/../autodrive_webserver" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/../autodrive_webserver/helloworld" isTestSource="false" />
+    <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/helloworld" isTestSource="false" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.8 (django)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
