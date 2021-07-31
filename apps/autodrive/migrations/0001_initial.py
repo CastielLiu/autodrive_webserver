@@ -33,7 +33,7 @@ class Migration(migrations.Migration):
             name='WebUser',
             fields=[
                 ('user_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='autodrive.User')),
-                ('type', models.CharField(choices=[('client', 'operator')], default='client', editable=False, max_length=10, verbose_name='用户类型')),
+                ('type', models.CharField(choices=[('ws_client', 'operator')], default='ws_client', editable=False, max_length=10, verbose_name='用户类型')),
             ],
             bases=('autodrive.user',),
         ),

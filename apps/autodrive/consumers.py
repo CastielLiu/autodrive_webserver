@@ -6,14 +6,15 @@ import time
 from channels.generic.websocket import WebsocketConsumer
 from django.db.models import Q, F
 
-from apps.autodrive.client.carclient import CarClient
-from apps.autodrive.client.webclient import UserClient
+from apps.autodrive.ws_client.carclient import CarClient
+from apps.autodrive.ws_client.webclient import UserClient
 
 from .models import CarUser, WebUser
+from .utils import userLoginCheck
 
 g_test_clients = []
-g_car_clients = dict()  # user_id: object
-g_user_clients = dict()  # user_id: object
+g_car_clients = dict()  # user_id:  client_object
+g_user_clients = dict()  # user_id: client_object
 
 
 # websocket消费者测试例
@@ -23,12 +24,12 @@ class TestConsumer(WebsocketConsumer):
         if self not in g_test_clients:
             g_test_clients.append(self)
 
-        print("client count: %d" % len(g_test_clients))
+        print("ws_client count: %d" % len(g_test_clients))
 
     def disconnect(self, close_code):
         if self in g_test_clients:
             g_test_clients.remove(self)
-        print("client count: %d" % len(g_test_clients))
+        print("ws_client count: %d" % len(g_test_clients))
 
     def receive(self, text_data):
         text_data_dict = json.loads(text_data)
@@ -43,6 +44,7 @@ class TestConsumer(WebsocketConsumer):
 class ClientConsumer(WebsocketConsumer):
     user_id = None
     user_name = None
+    token = ""
     login_ok = False
 
     # 关闭连接, response: 关闭回应
@@ -51,35 +53,6 @@ class ClientConsumer(WebsocketConsumer):
             print("closeConnect", response)
             self.send(response)
         self.close()
-
-    # 用户登录验证, 使用user_id/user_name + password进行登录验证
-    # @param database: 用户信息数据库
-    # @param data_dict: 用户请求登录数据
-    # @return 验证成功？, 消息
-    def userCheck(self, database, data_dict):
-        user_id = data_dict.get("user_id", None)
-        user_name = data_dict.get("user_name", None)
-        password = data_dict.get("password", None)
-
-        # 登录信息不完全
-        if (user_name is None and user_id is None) or password is None:
-            return False, "错误请求"
-
-        # users = database.objects.all()
-        # for user in users:
-        #     print(user.password, user.userid, user.username)
-
-        try:
-            # 使用Q对象筛选用户, 查找username或userid匹配的用户
-            db_user = database.objects.get(Q(username=user_name) | Q(userid=user_id) & Q(is_active=True))
-        except Exception as e:
-            return False, "用户不存在"
-
-        if db_user.password != password:
-            return False, "密码错误"
-        self.user_id = db_user.userid
-        self.user_name = db_user.username
-        return True, "登录成功"
 
     # 用户登录, 登录成功后将其加入用户列表
     # @param database: 用户信息数据库
@@ -94,21 +67,29 @@ class ClientConsumer(WebsocketConsumer):
             responce["msg"]["info"] = "重复登录"
             self.send(json.dumps(responce))
         else:  # 尚未登录
-            ok, msg = self.userCheck(database, data_dict)
-            responce["msg"]["result"] = ok
-            responce["msg"]["info"] = msg
+            user_id = data_dict.get("user_id", "")
+            user_name = data_dict.get("username", "")
+            password = data_dict.get("password", "")
+            token = data_dict.get("token", "")
+
+            login_res = userLoginCheck(database, user_id, user_name, password, token)
+
+            responce["msg"]["result"] = login_res['ok']
+            responce["msg"]["info"] = login_res['info']
             print(responce)
             self.send(json.dumps(responce))
-            if not ok:
+            if not login_res['ok']:
                 self.close()
                 return False
             self.login_ok = True
+            self.user_id = login_res['userid']
+            self.user_name = login_res['username']
 
             # 当前车辆是否在客户端列表, 无则添加
             if self.user_id not in clients:
                 clients[self.user_id] = client_type(self.user_id, self.user_name, self)
-                print("new client, id: %s, type: %s, total: %d" % (
-                self.user_id, clients[self.user_id].type, len(clients)))
+                print("new ws_client, id: %s, type: %s, total: %d" % (
+                    self.user_id, clients[self.user_id].type, len(clients)))
 
         # 调用子类登录成功‘回调函数’(如果有)
         on_login = getattr(self, "on_login", None)
@@ -213,13 +194,13 @@ class UserClientConsumer(ClientConsumer):
         report = {"type": "rep_car_state", "msg": None}
         while self.thread_run_flag:
             try:
-                for car_id, car_attrs in self.listen_cars.items:
+                for car_id, car_attrs in self.listen_cars.items():
                     if car_id not in g_car_clients:
                         continue
                     report['msg'] = g_car_clients[car_id].reltimedata(car_attrs)
                     self.send(json.dumps(report))
             except Exception as e:
-                print(e)
+                print("reportThread error", e)
             time.sleep(0.1)
 
     # 重载父类方法 手动接受连接
