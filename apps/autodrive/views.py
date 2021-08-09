@@ -2,10 +2,13 @@ from functools import wraps
 
 from django.shortcuts import render, redirect
 from django.http import HttpRequest, HttpResponse, HttpResponseNotFound
+from django.views.decorators.csrf import csrf_exempt
+
 from apps.autodrive.consumers import g_car_clients, g_user_clients
 import json
-from apps.autodrive.utils import userLoginCheck, randomToken, delteToken
-from apps.autodrive.models import WebUser
+from apps.autodrive.utils import userLoginCheck, randomToken, userLogout, pretty_floats
+from apps.autodrive.models import WebUser, CarUser
+from apps.autodrive.nodes.nav_path import *
 
 
 # Create your views here.
@@ -44,52 +47,118 @@ def login(request):
     login_res = userLoginCheck(WebUser, user_name, user_name, password)
 
     if login_res['ok']:  # 登录成功 ,标记 is_login
+
+        print("登录成功", login_res)
         request.session['is_login'] = True
-        request.session['username'] = login_res['username']
-        request.session['password'] = password
+        request.session.update(login_res)  # 合并字典,取代逐个复制
+
+        # request.session['username'] = login_res['username']
+        # request.session['userid'] = login_res['userid']
+        # request.session['password'] = password
+        # request.session['group'] = login_res['group']
+        # request.session['is_super'] = login_res['is_super']
+
         respose = redirect(request.GET.get('next'))
+
+        # 将token与userid经cookie发送给用户, 用户登录验证websocket
+        # 最初方案为保存userame但测试表明cookie设置中文出现问题, 从而修改为保存id
+        respose.set_cookie('userid', login_res['userid'])
         respose.set_cookie('token', login_res['token'])
-        respose.set_cookie('test', 'test')
+
+        print(respose.cookies)
         return respose
     else:
-        return render(request, 'autodrive/login.html')
+        error = login_res['info']
+        return render(request, 'autodrive/login.html', locals())
 
 
+@check_login
 def logout(request):
     # 从会话中清除登录状态
     # request.session['is_login'] = False
 
-    print(request.session.get('username'))
-    delteToken(WebUser, request.session.get('username'))
+    print(request.session.get('username'), "logout")
+    userLogout(WebUser, request.session.get('username'))
     request.session.clear()  # 清空会话数据
+
     # 从定向到登录页面
     return redirect("/autodrive/login")
 
 
 @check_login
 def main_page(request):
+    username = request.session.get("username", "")
+    userid = request.session.get("userid", "")
+    group = request.session.get("group", "默认组")  # 用户组
+    is_super = request.session.get("is_super", False)  # 超级用户
+
+    print("所属组：", group, "是否为超级用户:", is_super)
+
     if request.method == "GET":
-        username = request.session.get("username", "")
-        password = request.session.get("password", "")
+        # username = request.session.get("username", "")
+        # password = request.session.get("password", "")
         return render(request, 'autodrive/index.html', locals())
     elif request.method != "POST":
         return HttpResponseNotFound()
 
-    response = {"type": "未知", "msg": "错误请求"}
     reqest_body = json.loads(request.body)
-    msg_type = reqest_body.get("type")
-    msg = reqest_body.get("msg")
+    req_type = reqest_body.get("type", "")
+    data = reqest_body.get("data", {})
+    print("autodrive post req_type: ", req_type)
 
-    if msg_type == "req_online_car":  # 请求获取在线车辆列表
-        cars = []
-        for car_id, car_client in g_car_clients.items():
-            cars.append({"id": car_id, "name": car_client.name})
+    # code默认0为成功, 其他根据type进行编码
+    response = {"type": "", "code": 0, "msg": "", "data": {}}
+    response_text = json.dumps({"type": "", "code": 1, "msg": "", "data": {}})
+    if req_type == "req_online_car":  # 请求获取在线车辆列表
+        response['type'] = 'res_online_car'
+        car_group = data.get('group', '')
 
-        response["type"] = "res_online_car"
-        response["msg"] = {"cars": cars}
-        # "msg": {"cars": [{"id": x, "name": x}]}
+        if group != car_group and not is_super:
+            response['code'] = 7  # 非组内用户(无权限)
+        else:
+            cars = []
+            try:
+                if is_super:
+                    db_cars = CarUser.objects.filter(is_active=True)  # 超级权限, 显示所有用户
+                else:
+                    db_cars = CarUser.objects.filter(group=car_group, is_active=True)
+                for db_car in db_cars:
+                    # print("%s, %s, %s" % (db_car.group.supergroup, db_car.group.name, group))
+                    cars.append({"id": db_car.userid, "name": db_car.username, "group": db_car.group.name,
+                                 "online": db_car.is_online})
+            except Exception as e:
+                pass
 
-    return HttpResponse(json.dumps(response))
+            # 在线车辆
+            # for car_id, car_client in g_car_clients.items():
+            #     cars.append({"id": car_id, "name": car_client.name})
+
+            response["data"] = {"cars": cars}
+            response_text = json.dumps(response)
+            # "data": {"cars": [{"id": x, "name": x}]}
+    elif req_type == "req_path_list":  # 获取路径列表
+        response['type'] = 'res_path_list'
+        path_list = getAvailbalePaths(group)
+        if path_list is None:
+            response['code'] = 1
+        else:
+            response['data'] = {"path_list": path_list}
+        response_text = json.dumps(response, ensure_ascii=False)  # ensure_ascii=False 允许中文编码
+
+    elif req_type == "req_path": # 获取路径信息
+        response['type'] = 'res_path'
+        pathid = data.get('pathid', -1)
+
+        path = getNavPath(pathid)
+        if path is None:
+            response['code'] = 1
+        else:
+            response['data'] = {"path": path}
+        # json.encoder.FLOAT_REPR = lambda x: format(x, '.2f')  #json为浮点数保留一定位数, 当优化器存在时无效
+        # print(pretty_floats(response, 5))
+        response_text = json.dumps(pretty_floats(response, 5), ensure_ascii=False)
+
+    return HttpResponse(response_text)
 
 
 def test_page(request):

@@ -1,7 +1,20 @@
+from functools import partial
+
 from django.db.models import Q, F
 from random import Random
 import string
 
+
+def pretty_floats(obj, cnt):
+    if isinstance(obj, float):
+        return round(obj, cnt)
+    elif isinstance(obj, dict):
+        return dict((k, pretty_floats(v, cnt)) for k, v in obj.items())
+    elif isinstance(obj, (list, tuple)):
+        # map(fun, list) 根据提供的函数对指定的序列做映射, 用fun依次处理列表数据, 然后返回一个新列表
+        # partial(fun, params) 给fun绑定一个参数然后返回一个新的可调用对象
+        return list(map(partial(pretty_floats, cnt=cnt), obj))
+    return obj
 
 # 生成随机令牌,
 # 用户使用帐号密码登录验证成功后生成, 退出后删除
@@ -17,11 +30,12 @@ def randomToken(token_len=10):
     return token
 
 
-def delteToken(database, username):
+def userLogout(database, username):
     try:
         # 使用Q对象筛选用户, 查找username或userid匹配的用户
         db_user = database.objects.get(Q(username=username) | Q(userid=username) & Q(is_active=True))
         db_user.token = None
+        db_user.is_online = False
         db_user.save()
     except Exception as e:
         return False
@@ -32,33 +46,38 @@ def delteToken(database, username):
 # @param user_id, user_name, password, token: 用户请求登录数据
 # @return 验证结果
 def userLoginCheck(database, user_id, user_name, password, token=""):
-    result = {"ok": False, "info": "xx"}
+    result = {"ok": False, "info": ""}
 
-    # users = database.objects.all()
-    # for user in users:
-    #     print(user.password, user.userid, user.username)
-
+    users = database.objects.all()
+    for user in users:
+        print(user.userid, user.username, user.password)
+    print("%s_%s_%s" %(user_id, user_name, password))
     try:
         # 使用Q对象筛选用户, 查找username或userid匹配的用户
         db_user = database.objects.get(Q(username=user_name) | Q(userid=user_id) & Q(is_active=True))
     except Exception as e:
-        result['info'] = "用户不存在"
+        print(e)
+        result['info'] = "No user!"
         return result
 
     if db_user.password != password and db_user.token != token:
-        result['info'] = "密码或token错误"
+        result['info'] = "Error password or token"
         return result
 
     if token == "":  #
         db_user.token = randomToken(20)  # 登录验证成功, 生成token并存储在数据库
-        db_user.save()  # 只有调用save后才会保存到数据库
+
+    db_user.is_online = True
+    db_user.save()  # 只有调用save后才会保存到数据库
 
     result['ok'] = True
-    result['info'] = "验证成功"
+    result['info'] = "Successed login"
     result['username'] = db_user.username
     result['userid'] = db_user.userid
     result['token'] = db_user.token
+    result['group'] = db_user.group.name
+
+    if db_user.type == db_user.WebType:
+        result['is_super'] = db_user.is_super
     return result
-
-
 

@@ -9,5 +9,5 @@ urlpatterns = [
     # path转换器
     path('update_book/<int:book_id>', views.update_book),
     path('delete_book/', views.delete_book),
-    path('add_book/', views.add_book)
+    path('add_book/', views.add_book),
 ]

@@ -26,9 +26,15 @@
 
     <!-- Content -->
     <div id="content" class="colM">
+        {% if error %}
+            <p class="errornote">
+                {{ error }}
+            </p>
+        {% endif %}
+
         <div id="content-main">
             <form action="/autodrive/login/?next=/autodrive/" method="post" id="login-form">
-                <input type="hidden" name="csrfmiddlewaretoken" value="J1udMC3acwqLdU9iVLqRC6iGqa9MYXyoCZgbv1dlbd96grh1bzESTJH0xxJGehhY">
+                {% csrf_token  %}
               <div class="form-row">
                 <label class="required" for="id_username">用户名:</label> <input type="text" name="username" autofocus="" required="" id="id_username">
               </div>

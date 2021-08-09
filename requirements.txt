@@ -1,0 +1,9 @@
+# This file may be used to create an environment using:
+# $ conda create --name <env> --file <this file>
+# platform: linux-64
+channels==2.1.7
+channels-redis==2.3.3
+django==2.2.12
+mysqlclient==2.0.3
+python==3.8.10
+sqlite==3.36.0

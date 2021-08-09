@@ -117,3 +117,4 @@ def add_book(request):
 
     Book.objects.create(title=title, pub=pub, price=price, market_price=market_price, is_active=True)
     return HttpResponseRedirect('/bookstore/all_book')
+

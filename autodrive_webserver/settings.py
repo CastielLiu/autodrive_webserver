@@ -22,11 +22,12 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = '*7*lu8sw4yoy9nd&w_*f_#)ws#_tqeqda8y5w!n0e5!ya-c76f'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
+# 当使用runserver时需要跟上0.0.0.0:port参数 这是客户端访问的第一道屏障通过之后才检测ALLOWED_HOSTS
 # 允许被访问的地址, '*'允许所有
 # ALLOWED_HOSTS = ['*']
-ALLOWED_HOSTS = ['127.0.0.1', '192.168.1.100', '192.168.0.173']
+ALLOWED_HOSTS = ['127.0.0.1', '192.168.1.100', '192.168.0.173', '36.155.113.13']
 
 # Application definition
 
@@ -46,7 +47,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    # 'django.middleware.csrf.CsrfViewMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -89,9 +90,9 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'driverless',
-        'USER': 'root',
-        'PASSWORD': '123456',
-        'HOST': '127.0.0.1',
+        'USER': 'castiel',
+        'PASSWORD': 'castiel_pw',
+        'HOST': '36.155.113.13',  # 127.0.0.1  36.155.113.13
         'PORT': '3306',
         'CHARSET': 'utf8'
     }
@@ -135,6 +136,8 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = (
     os.path.join(BASE_DIR, "static"),
 )
+# uwsgi或nginx或runserver非调试模式下所需要的静态文件目录
+STATIC_ROOT = os.path.join(BASE_DIR, "collectstatic")
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # 引擎（使用数据库作为引擎）
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # 是否关闭浏览器使得Session过期（默认）

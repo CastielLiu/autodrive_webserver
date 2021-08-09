@@ -1,4 +1,7 @@
 # equal to views.py(视图函数) django
+
+import sys
+
 import json
 import threading
 import time
@@ -10,34 +13,10 @@ from apps.autodrive.ws_client.carclient import CarClient
 from apps.autodrive.ws_client.webclient import UserClient
 
 from .models import CarUser, WebUser
-from .utils import userLoginCheck
+from .utils import userLoginCheck, userLogout
 
-g_test_clients = []
 g_car_clients = dict()  # user_id:  client_object
 g_user_clients = dict()  # user_id: client_object
-
-
-# websocket消费者测试例
-class TestConsumer(WebsocketConsumer):
-    def connect(self):
-        self.accept()
-        if self not in g_test_clients:
-            g_test_clients.append(self)
-
-        print("ws_client count: %d" % len(g_test_clients))
-
-    def disconnect(self, close_code):
-        if self in g_test_clients:
-            g_test_clients.remove(self)
-        print("ws_client count: %d" % len(g_test_clients))
-
-    def receive(self, text_data):
-        text_data_dict = json.loads(text_data)
-        message = text_data_dict['message']
-
-        self.send(text_data=json.dumps({
-            'message': message
-        }))
 
 
 # 客户端消费者基类
@@ -66,8 +45,8 @@ class ClientConsumer(WebsocketConsumer):
             responce["msg"]["result"] = True
             responce["msg"]["info"] = "重复登录"
             self.send(json.dumps(responce))
-        else:  # 尚未登录
-            user_id = data_dict.get("user_id", "")
+        else:  # 尚未登录,进行验证
+            user_id = data_dict.get("userid", "")
             user_name = data_dict.get("username", "")
             password = data_dict.get("password", "")
             token = data_dict.get("token", "")
@@ -76,7 +55,7 @@ class ClientConsumer(WebsocketConsumer):
 
             responce["msg"]["result"] = login_res['ok']
             responce["msg"]["info"] = login_res['info']
-            print(responce)
+            print("login check.", responce)
             self.send(json.dumps(responce))
             if not login_res['ok']:
                 self.close()
@@ -88,7 +67,7 @@ class ClientConsumer(WebsocketConsumer):
             # 当前车辆是否在客户端列表, 无则添加
             if self.user_id not in clients:
                 clients[self.user_id] = client_type(self.user_id, self.user_name, self)
-                print("new ws_client, id: %s, type: %s, total: %d" % (
+                print("new ws_client connect, id: %s, type: %s, total: %d" % (
                     self.user_id, clients[self.user_id].type, len(clients)))
 
         # 调用子类登录成功‘回调函数’(如果有)
@@ -99,10 +78,11 @@ class ClientConsumer(WebsocketConsumer):
 
     # 注销用户
     # clients 已登录用户列表
-    def logout(self, clients):
+    def logout(self, database, clients):
         if self.login_ok and self.user_id in clients:
             client = clients.pop(self.user_id)
             print("user: %s logout, remaind %d %s users" % (self.user_id, len(clients), client.type))
+        userLogout(database, self.user_name)  # 在数据库中标注离线
         self.login_ok = False
         self.user_id = -1
         # 调用子类注销成功‘回调函数’(如果有)
@@ -132,14 +112,14 @@ class ClientConsumer(WebsocketConsumer):
             return None, None
 
         msg_type = data_dict.get('type', None)
-        msg_dict = data_dict.get('msg', dict())
+        msg_dict = data_dict.get('data', dict())
 
         if msg_type is None:  # 无type字段
             self.closeConnect("消息类型错误!")
         elif msg_type == "req_login":  # 登录请求
             self.login(database, msg_dict, clients, client_type)
         elif msg_type == "req_logout":  # 注销
-            self.logout(clients)
+            self.logout(database, clients)
         else:  # 其他消息类型
             if self.login_ok:  # 已经登录
                 return msg_type, msg_dict  # 数据需继续处理
@@ -158,11 +138,12 @@ class CarClientsConsumer(ClientConsumer):
 
     # 重载父类方法
     def disconnect(self, close_code):
-        self.logout(g_car_clients)
+        # 车端客户断开链接时自动注销
+        self.logout(CarUser, g_car_clients)
 
     # 重载父类方法
     def receive(self, text_data):
-        # print(text_data)
+        print("ws_receive: ", text_data)
         msg_type, msg = self.preprocesse(text_data, CarUser, g_car_clients, CarClient)
         if not msg_type:
             return
@@ -210,11 +191,16 @@ class UserClientConsumer(ClientConsumer):
     # 重载父类方法
     def disconnect(self, close_code):
         self.thread_run_flag = False
-        self.logout(g_user_clients)
+
+        # web用户webSocket断开连接时不注销用户, 防止用户刷新页面后token失效
+        # 仅当http请求注销时进行注销
+        # self.logout(WebUser, g_user_clients)
 
     # 重载父类方法
     def receive(self, text_data):
-        print(text_data)
+        print(text_data, type(text_data))
+
+        print("ws_receive: ", text_data)
         response = {"type": "", "msg": ""}
         msg_type, msg = self.preprocesse(text_data, WebUser, g_user_clients, UserClient)
         if not msg_type:

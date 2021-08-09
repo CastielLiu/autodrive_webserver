@@ -2,7 +2,7 @@
 
 ## 1. 请求与响应格式
 ### 1.1 客户端消息格式
-{"type": type, "msg": msg, ...}
+{"type": type, "code": code, "msg": msg, "data": data}
 
 |  参数    | 值  |  描述  |
 |  ----  | ----  | --- |
@@ -24,11 +24,13 @@
 
 ### 2.2 请求注销 req_logout 响应注销 res_logout
 客户端: 空
+
 服务端: 空
 
 ### 2.3 请求在线车辆列表(http) req_online_car 响应 res_online_car
-客户端: 空
-服务端: {"cars": [{"id": xx, "name": xx}, {"id": xx, "name": xx}, ...]}
+客户端: {"group": "zte"} 请求特定组, 后台应判断用户的请求权限
+
+服务端: {"res_code": code, "cars": [{"id": xx, "name": xx}, {"id": xx, "name": xx}, ...]}
 
 ### 2.4 请求监听车辆数据 req_listen_car 响应 res_listen_car
 客户端: {"cars": [{"id": xx, "attr": ["speed", "angle", ...]}, ...]}\
