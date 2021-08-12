@@ -37,10 +37,17 @@
 </div>
 </br>
 
-<div id="newDiv">
+<div id="newDiv"></div>
 
-
-</div>
+<form method="post" action="/helloworld/a_upload/" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="form-group">
+        选择附件：<br>
+        <input type="file" name="myfiles" multiple=""> <br>
+    </div>
+    <button type="submit" class="btn btn-default"> 上传</button>
+    <br>
+</form>
 
 <script type="text/javascript">
     function buttonClicked(){

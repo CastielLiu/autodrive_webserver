@@ -11,7 +11,6 @@
     <!--引入jquery 不能使用<script /> ,只能使用<script  ></script>-->
     <script type="text/javascript" src="/static/js/jquery-3.6.0.min.js"></script>
     <script src="/static/autodrive/js/tools.js"></script>
-<!--    <script src="/static/autodrive/js/websocket.js"></script>-->
     <script src="/static/autodrive/js/http.js"></script>
     <script src="/static/autodrive/js/index.js"></script>
 
@@ -25,7 +24,9 @@
         <div id="branding">
             <h1 id="site-name"><a href="">自动驾驶管理系统</a></h1>
         </div>
-        <div id="user-tools">欢迎，<strong id="active_username">{{ group }}: {{ username }}</strong>.  <a href="">修改密码</a> /<a href="logout/">注销</a>
+        <div id="user-tools">欢迎，<strong id="active_usergroup">{{ usergroup }}</strong>:
+            <strong id="active_username">{{ username }}</strong>.
+            <a href="">修改密码</a> /<a href="logout/">注销</a>
         </div>
     </div>
     <!-- END Header -->
@@ -33,15 +34,17 @@
     <!-- Content -->
     <div id="content">
 
-    <div hidden>
-        用户名: <input id="username" type="text" value="" required="required">
-        密码: <input id="password" type="password" value="" required="required">
-        <button id="connectBtn" onclick="connect()" name="connect">连接</button>
-        <i id="loginInfo"></i>
-        </br>
-    </div>
-        <input type="button" id="getPathListBtn" value="获取路径列表"> </input>
-        pathid: <input type="number" value="0" id="pathid"/>
+        <div hidden>
+            用户名: <input id="username" type="text" value="" required="required">
+            密码: <input id="password" type="password" value="" required="required">
+            <button id="connectBtn"  name="connect">连接</button>
+            </br>
+        </div>
+        websocket状态: <i id="loginInfo"></i> </br>
+        <input type="button" id="getPathListBtn" value="刷新路径列表"> </input>
+        <select id="pathList">
+            <option value="empty">--------</option>
+        </select>
         <input type="button" id="getPathBtn" value="获取路径点"> </input>
 
         <input type="button" id="wsTestBtn" value="ws测试"> </input>

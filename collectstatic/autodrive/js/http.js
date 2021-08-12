@@ -44,7 +44,7 @@ function HttpRequest(obj){
     // 添加此请求头以通过csrf防御
     request.setRequestHeader("X-CSRFToken", tools.getCookie('csrftoken')); // open之后才能设置请求头
 
-    tools.send_log("http: " + JSON.stringify(obj.cmd))
+    tools.send_log("http: " + JSON.stringify(obj.cmd));
 
     request.send(JSON.stringify(obj.cmd));
     request.onreadystatechange=function(){
@@ -95,11 +95,22 @@ function requestListenCars(car_id){
 }
 
 function requestPathList(group){
+    tools.send_log(group);
     HttpRequest({
         cmd: {"type":"req_path_list", "data": {"group": group}},
         url: "",
         done: function(data){
             dict = JSON.parse(data);
+            if(dict.code != 0)
+                return;
+
+            var obj = document.getElementById("pathList");
+            obj.options.length = 0;  // 删除所有option
+            path_list = dict.data.path_list;
+            for(let idx=0; idx<path_list.length; idx++){
+                path = path_list[idx];
+                obj.add(new Option(path.name, path.id))
+            }
         }
     });
 }

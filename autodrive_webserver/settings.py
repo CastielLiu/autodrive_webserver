@@ -22,7 +22,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = '*7*lu8sw4yoy9nd&w_*f_#)ws#_tqeqda8y5w!n0e5!ya-c76f'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 # 当使用runserver时需要跟上0.0.0.0:port参数 这是客户端访问的第一道屏障通过之后才检测ALLOWED_HOSTS
 # 允许被访问的地址, '*'允许所有
@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'channels',  # for websockets
     'apps.bookstore',
     'apps.autodrive',
+    'apps.helloworld',
 ]
 
 MIDDLEWARE = [
@@ -138,6 +139,17 @@ STATICFILES_DIRS = (
 )
 # uwsgi或nginx或runserver非调试模式下所需要的静态文件目录
 STATIC_ROOT = os.path.join(BASE_DIR, "collectstatic")
+
+# 上传文件和文件夹的权限
+FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o755
+FILE_UPLOAD_PERMISSIONS = 0o644
+
+# 上传文件的根目录, django默认storage的路径
+MEDIA_ROOT = os.path.join(BASE_DIR, 'uploadfiles/')
+# django的admin默认使用该URL访问上传的文件,为保证后台能够正常查看文件, 此处直接写到了子路由
+MEDIA_URL = '/autodrive/upload/'  # 这个是在浏览器上访问上传文件的url的前缀
+
+AUTODRIVE_FILE_PATH = "/var/lib/mysql/files/autodrive/paths/"
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # 引擎（使用数据库作为引擎）
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # 是否关闭浏览器使得Session过期（默认）

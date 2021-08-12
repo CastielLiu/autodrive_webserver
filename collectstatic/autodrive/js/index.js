@@ -39,11 +39,12 @@
 
             // .class  #id
             $(document).on('click', '#getPathListBtn', function(e){
-               requestPathList("测试组");
+               requestPathList($('#active_usergroup').html());
             });
 
             $(document).on('click', '#getPathBtn', function(e){
-               requestPath(parseInt($('#pathid').val()));
+                var pathid = $("#pathList option:selected").val();
+                requestPath(parseInt(pathid));
             });
 
             $(document).on('click', '#wsTestBtn', function(e){
@@ -62,9 +63,6 @@
 
                 }
             });
-
-
-
 
             $(document).on('click', '#flush_online_cars', function(e){
                requestOnlineCars("测试组"); //http
@@ -118,11 +116,11 @@
         },
 
         core_ws_onmessage: function(evt){
-            var data, type, msg;
+            var message, type, msg;
             try{ //json解析 异常捕获
-                data = JSON.parse(evt.data);
-                type = data.type;
-                msg = data.msg;
+                message = JSON.parse(evt.data);
+                type = message.type;
+                data = message.data;
                 if(typeof(type) == "undefined")
                     return;
             }catch(err){

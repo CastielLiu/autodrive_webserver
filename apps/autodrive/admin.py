@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, CarUser, WebUser, UserGroup
+from .models import *
 
 
 # Register your models here.
@@ -18,14 +18,18 @@ class UserManager(admin.ModelAdmin):
     # 更多方法https://docs.djangoproject.com/en/2.2/ref/contrib/admin/
 
 
-# 为使管理员在admin页面操作数据表, 需要在此注册
-admin.site.register(CarUser, UserManager)  # 第二个为可选参数[模型管理器类]
-admin.site.register(WebUser, UserManager)
-
-
-class UserGroupMaager(admin.ModelAdmin):
+class UserGroupManager(admin.ModelAdmin):
     list_display = ['name', 'supergroup']
 
 
+class NavPathInfoManager(admin.ModelAdmin):
+    list_display = ['id', 'name', 'uploader', 'upload_time', 'points_file', 'extend_file']
+    list_display_links = ['id', 'name']
+
+
 # 注册
-admin.site.register(UserGroup, UserGroupMaager)
+# 为使管理员在admin页面操作数据表, 需要在此注册
+admin.site.register(CarUser, UserManager)  # 第二个为可选参数[模型管理器类]
+admin.site.register(WebUser, UserManager)
+admin.site.register(UserGroup, UserGroupManager)
+admin.site.register(NavPathInfo, NavPathInfoManager)

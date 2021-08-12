@@ -1,8 +1,9 @@
+
+// AJAX请求 jQuery
 function HttpRequest2(obj) {
     var headers = {
         // csrf防御请求头
         'X-CSRFToken': tools.getCookie('csrftoken'),
-
     };
 
     return $.ajax({
@@ -14,13 +15,18 @@ function HttpRequest2(obj) {
         timeout:90000,
         data: JSON.stringify(obj.cmd),
 
-        success: function(data){
-            tools.receive_log("http: " + data)
-            obj.done(data);
+        success: function(data, status, xhr){
+            redirect_url = xhr.getResponseHeader('Redirect');
+//            tools.receive_log(redirect_url);
+            if(typeof(redirect_url)=='string' && redirect_url.length>0){
+                window.location.href = redirect_url;
+            }else{
+//                tools.receive_log("http: " + data);
+                obj.done(data);
+            }
         },
     })
 };
-
 
 //获取http请求对象
 function getXMLHttpRequest(){
@@ -34,24 +40,33 @@ function getXMLHttpRequest(){
     return xmlhttp;
 }
 
+// AJAX请求 JS
 function HttpRequest(obj){
-    request = getXMLHttpRequest();
-    if (request == null)
+    xhr = getXMLHttpRequest();
+    if (xhr == null)
         return;
 
-    request.open(obj.method || "POST", obj.url || "", obj.async || true);
+    xhr.open(obj.method || "POST", obj.url || "", obj.async || true);
 
     // 添加此请求头以通过csrf防御
-    request.setRequestHeader("X-CSRFToken", tools.getCookie('csrftoken')); // open之后才能设置请求头
+    xhr.setRequestHeader("X-CSRFToken", tools.getCookie('csrftoken')); // open之后才能设置请求头
 
-    tools.send_log("http: " + JSON.stringify(obj.cmd))
+    tools.send_log("http: " + JSON.stringify(obj.cmd));
 
-    request.send(JSON.stringify(obj.cmd));
-    request.onreadystatechange=function(){
-        if(request.readyState!=4)
+    xhr.send(JSON.stringify(obj.cmd));
+    xhr.onreadystatechange=function(){
+        if(xhr.readyState!=4)
             return;
-        obj.done(request.responseText);
-        tools.receive_log("http: " + request.responseText)
+
+        redirect_url = xhr.getResponseHeader('Redirect');
+        //判断是否为重定向应答
+        if(typeof(redirect_url)=='string' && redirect_url.length>0){
+            window.location.href = redirect_url; //加载重定向url
+        }else{
+            tools.receive_log("http: " + xhr.responseText);
+            obj.done(xhr.responseText);
+        }
+
     }
 }
 
@@ -95,11 +110,22 @@ function requestListenCars(car_id){
 }
 
 function requestPathList(group){
-    HttpRequest({
+    tools.send_log(group);
+    HttpRequest2({
         cmd: {"type":"req_path_list", "data": {"group": group}},
         url: "",
         done: function(data){
             dict = JSON.parse(data);
+            if(dict.code != 0)
+                return;
+
+            var obj = document.getElementById("pathList");
+            obj.options.length = 0;  // 删除所有option
+            path_list = dict.data.path_list;
+            for(let idx=0; idx<path_list.length; idx++){
+                path = path_list[idx];
+                obj.add(new Option(path.name, path.id))
+            }
         }
     });
 }

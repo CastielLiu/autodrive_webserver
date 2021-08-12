@@ -1,7 +1,10 @@
 # 拟定将导航路线存储到数据库, 客户端向服务请求路径信息
 # 远程控制端控制指令包含(速度, 路径ID, 等关键信息) 车端收到控制指令后再次向服务器请求路径数据
+from apps.autodrive.models import NavPathInfo
+from django.db.models import Q, F
 
-def gen_trajectory(_id=0, _name="path1"):
+
+def gen_test_trajectory(_id=0, _name="path1"):
     start_point = (33.3794, 120.16574722)
     end_point = (33.372647, 120.155741)
 
@@ -19,19 +22,75 @@ def gen_trajectory(_id=0, _name="path1"):
     return res
 
 
+def getTestNavPath(group_name, path_id):
+    if path_id == 0:
+        path = gen_test_trajectory(0, "路径0")
+    elif path_id == 1:
+        path = gen_test_trajectory(1, "路径1")
+    else:
+        return False, "Path not exist", None
+    return True, "", path
+
+
 # 获取组内可用路径(查数据库)
-def getAvailbalePaths(group):
-    return [{'id': 0, 'name': "路径0"}, {'id': 1, 'name': "路径1"}]
+def getAvailbalePaths(group_name):
+    paths = NavPathInfo.objects.filter(Q(uploader__group__name=group_name) & Q(is_active=True))
+    path_list = [{'id': path.id, 'name': path.name} for path in paths]
+    return path_list
 
 
 # 获取路径数据(查数据库)
-def getNavPath(path_id):
-    print(path_id)
-    if path_id == 0:
-        path = gen_trajectory(0, "路径0")
-    elif path_id == 1:
-        path = gen_trajectory(1, "路径1")
-    else:
-        return None
-    print(path_id, path)
-    return path
+# @param group_name 获取组内路径
+# @param path_id 路径ID
+def getNavPath(group_name, path_id):
+    navpaths = NavPathInfo.objects.filter(Q(id=path_id) & Q(uploader__group__name=group_name) & Q(is_active=True))
+    if navpaths.count() == 0:
+        return False, "Path not exist", None
+
+    navpath = navpaths[0]
+    path_result = {'id': path_id, 'name': navpath.name, 'points': []}
+
+    try:
+        with open(navpath.points_file.path) as f:
+            line = f.readline()
+            titles = line.split()
+            info_cnt = len(titles)
+            if info_cnt < 2:
+                return False, 'Invalid title count in path', None
+            try:
+                lat_index = titles.index('lat')
+                lng_index = titles.index('lng')
+            except Exception as e:
+                return False, 'Invalid title in path: '+e.args[0], None
+
+            while line:
+                line = f.readline()
+                infos = line.split()
+                if len(infos) != info_cnt:
+                    break
+                path_result['points'].append({"lng": infos[lng_index], "lat": infos[lat_index]})
+    except Exception as e:
+        return False, 'Path file error', None
+
+    if len(path_result['points']) == 0:
+        return False, "No points in file", None
+    return True, "", path_result
+
+
+# 获取导航路径文件
+def getNavPathFiles(group_name, path_id):
+    navpaths = NavPathInfo.objects.filter(Q(id=path_id) & Q(uploader__group__name=group_name) & Q(is_active=True))
+    if navpaths.count() == 0:
+        return False, "Path not exist", None
+
+    navpath = navpaths[0]
+
+
+
+
+
+
+
+
+
+

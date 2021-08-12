@@ -40,10 +40,10 @@ class ClientConsumer(WebsocketConsumer):
     # @param client_type: 客户类型
     # @return res: 登录成功
     def login(self, database, data_dict, clients, client_type):
-        responce = {"type": "res_login", "msg": {"result": False, "info": ""}}
+        responce = {"type": "res_login", "code": 0, "msg": "", "data": {}}
         if self.login_ok:  # 重复登录
-            responce["msg"]["result"] = True
-            responce["msg"]["info"] = "重复登录"
+            responce["code"] = 0
+            responce["msg"] = "重复登录"
             self.send(json.dumps(responce))
         else:  # 尚未登录,进行验证
             user_id = data_dict.get("userid", "")
@@ -52,14 +52,18 @@ class ClientConsumer(WebsocketConsumer):
             token = data_dict.get("token", "")
 
             login_res = userLoginCheck(database, user_id, user_name, password, token)
-
-            responce["msg"]["result"] = login_res['ok']
-            responce["msg"]["info"] = login_res['info']
-            print("login check.", responce)
-            self.send(json.dumps(responce))
-            if not login_res['ok']:
+            if login_res['ok']:
+                responce["code"] = 0
+                responce["msg"] = login_res['info']
+                print("login check.", responce)
+                self.send(json.dumps(responce))
+            else:
+                responce["code"] = 1
+                responce["msg"] = login_res['info']
+                self.send(json.dumps(responce))
                 self.close()
                 return False
+            
             self.login_ok = True
             self.user_id = login_res['userid']
             self.user_name = login_res['username']
@@ -118,6 +122,7 @@ class ClientConsumer(WebsocketConsumer):
             self.closeConnect("消息类型错误!")
         elif msg_type == "req_login":  # 登录请求
             self.login(database, msg_dict, clients, client_type)
+
         elif msg_type == "req_logout":  # 注销
             self.logout(database, clients)
         else:  # 其他消息类型
@@ -198,7 +203,7 @@ class UserClientConsumer(ClientConsumer):
 
     # 重载父类方法
     def receive(self, text_data):
-        print(text_data, type(text_data))
+        print("线程id: %d, 总线程数: %d" %(threading.currentThread().ident, len(threading.enumerate())))
 
         print("ws_receive: ", text_data)
         response = {"type": "", "msg": ""}
