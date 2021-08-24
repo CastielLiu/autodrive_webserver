@@ -1,11 +1,14 @@
 // 匿名函数利用括号包括,将自动自动执行
 (function(){
+    //所有JS全局对象,函数以及变量均自动成为window对象的成员
+    //为避免全局变量冲突, 将当前js文件中的功能封装到匿名函数
+    //为便于外部进行访问, 手动将index设置为window的成员
     var index = window.index = {
         test_key1: null,
         test_key2: null,
         core_ws: null,
         core_ws_login: 0,
-        test_str: "sdsfs",
+        update_cars_clock: null,
 
         init: function(){
             // 保存当前对象指针, 便于子函数访问父对象
@@ -13,6 +16,7 @@
 
             // requestOnlineCars("测试组"); //http
             this.initEvent(); //初始化事件过滤器
+            requestOnlineCars("");
         },
 
         initEvent: function(){
@@ -30,11 +34,6 @@
                 _this.connect_core_ws();
             });
 
-              // 方法无效，不知何故
-//            $('.dashboard').on('load', function(){
-//                connect_core_ws();
-//            });
-
             // .class  #id
             $(document).on('click', '#getPathListBtn', function(e){
                requestPathList($('#active_usergroup').html());
@@ -42,7 +41,7 @@
 
             $(document).on('click', '#getPathBtn', function(e){
                 var pathid = $("#pathList option:selected").val();
-                requestPath(parseInt(pathid));
+                requestPathTraj(parseInt(pathid));
             });
 
             $(document).on('click', '#connectBtn', function(e){
@@ -51,8 +50,6 @@
                 else
                     _this.connect_core_ws();
             });
-
-
 
             $(document).on('click', '#wsTestBtn', function(e){
                 ws = new WebSocket('ws://' + window.location.host + '/ws/autodrive/test/');
@@ -81,7 +78,13 @@
                 $(".showCarPos").each(function () {
                     $(this).prop("checked", flag);
                 });
+
+                window.clearInterval(_this.update_cars_clock);
+                if($(".showCarPos:checked").length > 0){
+                    _this.update_cars_clock = setInterval(requestCarsPosition, 1000);
+                }
             });
+            // 显示某车辆位置
             $(document).on('click', '.showCarPos', function(){
                 var flag = $(this).prop("checked");
                 if (!flag) {
@@ -91,10 +94,16 @@
                         $("#showAllCarsPos").prop("checked", flag);
                     }
                 }
+                window.clearInterval(_this.update_cars_clock);
+                if($(".showCarPos:checked").length > 0){
+                    _this.update_cars_clock = setInterval(requestCarsPosition, 1000);
+                }
+                console.log($(this).name);
             });
         },
 
         connect_core_ws: function(){
+            var relogin = true; //允许重新登录
             var _this = this;
             this.core_ws = new WebSocket('ws://' + window.location.host + '/ws/autodrive/web/core/');
             this.core_ws.onopen = function(){
@@ -106,7 +115,8 @@
                 var data;
                 if(typeof(token) == 'undefined' || typeof(userid) == 'undefined'){
                     loginInfo.innerHTML = "用户名或token不存在, 请勿禁用cookie";
-                    location.reload();
+                    // location.reload(); //重新加载页面已获得cookie
+
                     console.log("用户名或token不存在, 请勿禁用cookie");
                     return;
                 }
@@ -132,7 +142,6 @@
 
                 // 登录反馈
                 if(_this.core_ws_login==0 && type=="res_login"){
-                    tools.receive_log("code")
                     if(code == 0){ // 登录成功
                         _this.core_ws_login = 1;
                         connectBtn.name = "disconnect";
@@ -144,6 +153,11 @@
                         location.reload();
                         console.log("帐号或密码/token错误");
                     }
+                }
+                else if(type == "rep_force_offline"){
+                    alert("异处登录，您已被迫下线，可刷新页面重新登录");
+                    loginInfo.innerHTML = "异处登录，您已被迫下线，可刷新页面重新登录";
+                    _this.core_ws.close();
                 }
                 else if(type == "rep_car_state"){
                   // 状态数据
@@ -162,8 +176,6 @@
                     connectBtn.innerHTML = "连接";
                     _this.core_ws_login = 0;
                 }
-                loginInfo.innerHTML = "已断开, 正在重新连接";
-                _this.connect_core_ws(); //尝试重新登录core_ws
             };
         },
     };
@@ -173,6 +185,12 @@
 
 
 function showOnlineCars(cars){
+
+    // 在线靠前排序
+    cars.sort(function(a,b){
+        return b.online - a.online;
+    });
+
     console.log(cars);
     var tab="<table border='1'>";
     tab+="<tr><th>车辆ID</th><th>车辆名称</th><th>" +"<input type='checkbox' " + "id='showAllCarsPos'>显示位置"+"</th>"
@@ -180,13 +198,22 @@ function showOnlineCars(cars){
         +"</tr>";
 
     for(var i in cars){
-        tab += "<tr><td>" + cars[i].id + "</td><td>" + cars[i].name + "</td><td>"
-            +"<input type='checkbox' " +"class='showCarPos' name='" + cars[i].id + "'/>显示位置"+"</td>"
-            +"<td>" + (cars[i].online?"在线":"离线") + "</td><td>" +cars[i].group + "</td>"
-            +"</tr>"
+        tab += "<tr>";
+        tab += "<td>" + cars[i].id + "</td>";
+        tab += "<td>" + cars[i].name + "</td>";
+
+        if(cars[i].online){
+            tab += "<td><input type='checkbox' " +"class='showCarPos' name='" + cars[i].id + "'/>显示位置"+"</td>";
+            tab += "<td>在线</td>";
+        }else{
+            tab += "<td><input type='checkbox' disabled='disabled' class='no-showCarPos' name='" + cars[i].id + "'/>显示位置"+"</td>";
+            tab += "<td>离线</td>";
+        }
+
+        tab += "<td>" + cars[i].group + "</td>"
+        tab += "</tr>"
     }
     tab+="</table>";
-    console.log(tab);
 
     var divv=document.getElementById("cars_list");
     divv.innerHTML=tab;

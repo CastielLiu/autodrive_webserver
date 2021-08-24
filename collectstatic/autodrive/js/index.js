@@ -1,13 +1,11 @@
 // 匿名函数利用括号包括,将自动自动执行
 (function(){
-//    var core_ws;
-//    var core_ws_login = 0;
-
     var index = window.index = {
         test_key1: null,
         test_key2: null,
         core_ws: null,
         core_ws_login: 0,
+        test_str: "sdsfs",
 
         init: function(){
             // 保存当前对象指针, 便于子函数访问父对象
@@ -32,11 +30,6 @@
                 _this.connect_core_ws();
             });
 
-              // 方法无效，不知何故
-//            $('.dashboard').on('load', function(){
-//                connect_core_ws();
-//            });
-
             // .class  #id
             $(document).on('click', '#getPathListBtn', function(e){
                requestPathList($('#active_usergroup').html());
@@ -44,8 +37,17 @@
 
             $(document).on('click', '#getPathBtn', function(e){
                 var pathid = $("#pathList option:selected").val();
-                requestPath(parseInt(pathid));
+                requestPathTraj(parseInt(pathid));
             });
+
+            $(document).on('click', '#connectBtn', function(e){
+                if(_this.core_ws_login)
+                    _this.core_ws.close();
+                else
+                    _this.connect_core_ws();
+            });
+
+
 
             $(document).on('click', '#wsTestBtn', function(e){
                 ws = new WebSocket('ws://' + window.location.host + '/ws/autodrive/test/');
@@ -87,78 +89,82 @@
             });
         },
 
-        core_ws_onopen: function(){
-//            tools.showMsgToast("websocket cnnected.", 3000);
-            var userid = tools.getCookie('userid');
-            var token = tools.getCookie('token');
-            //        send_log("document.cookie: "+document.cookie);
-            //        send_log("token: " + token);
-            var data;
-            if(typeof(token) == 'undefined' || typeof(userid) == 'undefined'){
-                loginInfo.innerHTML = "用户名或token不存在, 请勿禁用cookie";
-                return;
-            }
+        connect_core_ws: function(){
+            var relogin = true; //允许重新登录
+            var _this = this;
+            this.core_ws = new WebSocket('ws://' + window.location.host + '/ws/autodrive/web/core/');
+            this.core_ws.onopen = function(){
+    //            tools.showMsgToast("websocket cnnected.", 3000);
+                var userid = tools.getCookie('userid');
+                var token = tools.getCookie('token');
+                //        send_log("document.cookie: "+document.cookie);
+                //        send_log("token: " + token);
+                var data;
+                if(typeof(token) == 'undefined' || typeof(userid) == 'undefined'){
+                    loginInfo.innerHTML = "用户名或token不存在, 请勿禁用cookie";
+                    // location.reload(); //重新加载页面已获得cookie
 
-            data = JSON.stringify({"type": "req_login", "data": {"userid": userid, "token": token}});
-
-            tools.send_log(data);
-            core_ws.send(data)
-        },
-
-        core_ws_onclose: function(evt){
-            if(this.core_ws_login)
-            {
-                connectBtn.name = "connect";
-                connectBtn.innerHTML = "连接";
-                this.core_ws_login = 0;
-                loginInfo.innerHTML = "";
-            }
-        },
-
-        core_ws_onmessage: function(evt){
-            var message, type, msg;
-            try{ //json解析 异常捕获
-                message = JSON.parse(evt.data);
-                type = message.type;
-                data = message.data;
-                if(typeof(type) == "undefined")
-                    return;
-            }catch(err){
-                return;
-            }
-
-            tools.receive_log("ws:" + JSON.stringify(data))
-
-            // 登录反馈
-            if(this.core_ws_login==0 && type=="res_login"){
-                if(msg.result){ // 登录成功
-                    this.core_ws_login = 1;
-                    connectBtn.name = "disconnect";
-                    connectBtn.innerHTML = "断开";
-                    loginInfo.innerHTML = "登录成功";
+                    console.log("用户名或token不存在, 请勿禁用cookie");
                     return;
                 }
-                else
-                    loginInfo.innerHTML = "帐号或密码错误";
-            }
-            else if(type == "rep_car_state"){
-              // 状态数据
-              // info.id
-              // info.car_state
-            }
-            else if(type == "res_online_car"){
-//                console.log(msg.cars)
-                showOnlineCars(msg.cars)
-            }
-        },
+                data = JSON.stringify({"type": "req_login", "data": {"userid": userid, "token": token}});
+                tools.send_log(data);
+                _this.core_ws.send(data)
+            };
 
-        connect_core_ws: function(){
-            core_ws = new WebSocket('ws://' + window.location.host + '/ws/autodrive/web/core/');
-            core_ws.onopen = this.core_ws_onopen;
-            core_ws.onmessage = this.core_ws_onmessage;
-            core_ws.onclose = this.core_ws_onclose;
-        },
+            this.core_ws.onmessage = function(evt){
+                tools.receive_log("ws:" + evt.data)
+                var code, type, msg;
 
+                try{ //json解析 异常捕获
+                    var message = JSON.parse(evt.data);
+                    type = message.type;
+                    data = message.data;
+                    code = message.code;
+                    if(typeof(type) == "undefined")
+                        return;
+                }catch(err){
+                    return;
+                }
+
+                // 登录反馈
+                if(_this.core_ws_login==0 && type=="res_login"){
+                    if(code == 0){ // 登录成功
+                        _this.core_ws_login = 1;
+                        connectBtn.name = "disconnect";
+                        connectBtn.innerHTML = "断开";
+                        loginInfo.innerHTML = "登录成功";
+                        return;
+                    }else{
+                        loginInfo.innerHTML = "帐号或密码/token错误";
+                        location.reload();
+                        console.log("帐号或密码/token错误");
+                    }
+                }
+                else if(type == "rep_force_offline"){
+                    alert("异处登录，您已被迫下线，可刷新页面重新登录");
+                    loginInfo.innerHTML = "异处登录，您已被迫下线，可刷新页面重新登录";
+                    _this.core_ws.close();
+                }
+                else if(type == "rep_car_state"){
+                  // 状态数据
+                  // info.id
+                  // info.car_state
+                }
+                else if(type == "res_online_car"){
+    //                console.log(msg.cars)
+                    showOnlineCars(msg.cars)
+                }
+            };
+            this.core_ws.onclose = function(evt){
+                if(_this.core_ws_login)
+                {
+                    connectBtn.name = "connect";
+                    connectBtn.innerHTML = "连接";
+                    _this.core_ws_login = 0;
+                }
+            };
+        },
     };
 
     index.init();

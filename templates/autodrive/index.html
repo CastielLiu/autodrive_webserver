@@ -1,13 +1,16 @@
 <!DOCTYPE html>
-<html lang="en" xmlns="http://www.w3.org/1999/html" xmlns="http://www.w3.org/1999/html"
-      xmlns="http://www.w3.org/1999/html" xmlns="http://www.w3.org/1999/html">
+<html lang="en" xmlns="">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-        <title>自动驾驶控制系统</title>
-        <link rel="stylesheet" type="text/css" href="/static/autodrive/css/base.css">
-        <link rel="stylesheet" type="text/css" href="/static/autodrive/css/dashboard.css">
-        <link rel="stylesheet" type="text/css" href="/static/autodrive/css/responsive.css">
     <meta name="viewport" content="user-scalable=no, width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+    <title>自动驾驶控制系统</title>
+<!--        <link rel="stylesheet" type="text/css" href="/static/autodrive/css/base.css">-->
+    <link rel="stylesheet" type="text/css" href="/static/autodrive/css/dashboard.css">
+    <link rel="stylesheet" type="text/css" href="/static/autodrive/css/responsive.css">
+    <link rel="stylesheet" type="text/css" href="/static/autodrive/css/layout.css">
+    <link rel="stylesheet" type="text/css" href="/static/autodrive/css/baidumap.css">
+
     <!--引入jquery 不能使用<script /> ,只能使用<script  ></script>-->
     <script type="text/javascript" src="/static/js/jquery-3.6.0.min.js"></script>
     <script src="/static/autodrive/js/tools.js"></script>
@@ -16,24 +19,55 @@
 
 </head>
 
-<!--  onload="onBodyLoad()"-->
-<body class=" dashboard">
-<div id="container"><!-- Container -->
-    <!-- Header -->
-    <div id="header">
-        <div id="branding">
-            <h1 id="site-name"><a href="">自动驾驶管理系统</a></h1>
-        </div>
-        <div id="user-tools">欢迎，<strong id="active_usergroup">{{ usergroup }}</strong>:
-            <strong id="active_username">{{ username }}</strong>.
-            <a href="">修改密码</a> /<a href="logout/">注销</a>
+<body class="autodrive-mainpage">
+<!-- Header -->
+<div id="header">
+    <div id="branding">
+        <h1 id="site-name"><a href="">自动驾驶管理系统</a></h1>
+    </div>
+    <div id="user-tools">欢迎，<strong id="active_usergroup">{{ usergroup }}</strong>:
+        <strong id="active_username">{{ username }}</strong>.
+        <a href="">修改密码</a> /<a href="logout/">注销</a>
+    </div>
+</div>
+<!-- END Header -->
+<div id="main_container"><!-- main Container -->
+    <div id="menu_container" >
+        <p>
+            <input type="button" id="getPathListBtn" value="刷新路径列表"> </input>
+            <select id="pathList">
+                <option value="empty">--------</option>
+            </select>
+        </p>
+        <p>
+            <input type="button" id="getPathBtn" value="获取路径点"> </input>
+        </p>
+        <input type="button" id="wsTestBtn" value="ws测试" hidden> </input>
+
+        <div id="online-cars">
+            车辆列表:  <input type="button" value="刷新" id="flush_online_cars"></input>
+            <div id="cars_list" class="cars_list"></div>
         </div>
     </div>
-    <!-- END Header -->
+    <!-- 地图盒子 -->
+    <div id="baidumap_container" class="map">
+        <!-- 百度地图API -->
+        <script type="text/javascript" src="http://api.map.baidu.com/api?key=&v=1.3&services=true"></script>
+        <script src="/static/autodrive/js/mapcontroller.js"></script>
 
+        <!-- 搜索显示框 -->
+        <div id="r-result">
+            地址: <input id="cityName" type="text" style="width:100px; margin-right:10px;" />
+            <input type="button" value="搜索" onclick="window.mapctrler.locationSearch()" /> 经度:
+            <input type="text" id="lng" /> 纬度：
+            <input type="text" id="lat" />
+            <button onclick="submit()">提交</button>
+        </div>
+
+    </div> <!-- end baidumap_container -->
     <!-- Content -->
-    <div id="content">
-
+    <div id="other_container">
+        <h1 align="center" >调试信息显示窗口</h1>
         <div hidden>
             用户名: <input id="username" type="text" value="" required="required">
             密码: <input id="password" type="password" value="" required="required">
@@ -41,31 +75,15 @@
             </br>
         </div>
         websocket状态: <i id="loginInfo"></i> </br>
-        <input type="button" id="getPathListBtn" value="刷新路径列表"> </input>
-        <select id="pathList">
-            <option value="empty">--------</option>
-        </select>
-        <input type="button" id="getPathBtn" value="获取路径点"> </input>
 
-        <input type="button" id="wsTestBtn" value="ws测试"> </input>
-
-    <div>
-        数据接收:</br>
-        <textarea type="text" id="receive_log" rows="20" cols="180"></textarea></br></br>
-        数据发送:</br>
-        <textarea type="text" id="send_log" rows="5" cols="180"></textarea>
-    </div>
-
-    <div>
-        车辆列表:  <input type="button" value="刷新" id="flush_online_cars"></input>
-        <div id="cars_list" class="cars_list"/>
-    </div>
+        <div id="debug_textarea">
+            数据接收:</br>
+            <textarea type="text" id="receive_log" rows="20"></textarea></br></br>
+            数据发送:</br>
+            <textarea type="text" id="send_log" rows="5"></textarea>
+        </div>
     </div><!-- END Content -->
-</div><!-- END Container -->
-
-<script>
-
-</script>
+</div><!-- END Man Container -->
 
 </body>
 </html>

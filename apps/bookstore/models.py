@@ -4,7 +4,7 @@ from django.db import models
 
 # Create your models here.
 class Book(models.Model):
-    title = models.CharField('书名', max_length=50, default='' , unique=True)
+    title = models.CharField('书名', max_length=50, default='', unique=True)
     pub = models.CharField('出版社', max_length=50, default='')
     price = models.DecimalField('价格', max_digits=7, decimal_places=2, default=0.0)
     discount = models.DecimalField('折扣', max_digits=3, decimal_places=2, default=1.0)

@@ -39,10 +39,10 @@ def getAvailbalePaths(group_name):
     return path_list
 
 
-# 获取路径数据(查数据库)
+# 获取路径轨迹数据(查数据库)
 # @param group_name 获取组内路径
 # @param path_id 路径ID
-def getNavPath(group_name, path_id):
+def getNavPathTraj(group_name, path_id):
     navpaths = NavPathInfo.objects.filter(Q(id=path_id) & Q(uploader__group__name=group_name) & Q(is_active=True))
     if navpaths.count() == 0:
         return False, "Path not exist", None

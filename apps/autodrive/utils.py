@@ -1,8 +1,14 @@
 from functools import partial
-
+from django.conf import settings
 from django.db.models import Q, F
 from random import Random
 import string
+
+
+# 自定义调试打印函数
+def debug_print(self, *args, **kwargs):
+    if settings.DEBUG:
+        print(self, args, kwargs)
 
 
 def pretty_floats(obj, cnt):
@@ -32,15 +38,17 @@ def randomToken(token_len=10):
 
 
 # @param update_db, 是否更新到数据库
-def userLogout(database, username, update_db=True):
+def userLogout(database, username, update_db=False):
     if update_db:
         try:
             # 使用Q对象筛选用户, 查找username或userid匹配的用户
             db_user = database.objects.get(Q(username=username) | Q(userid=username) & Q(is_active=True))
+            db_user.session_key = ""
             db_user.token = None
             db_user.is_online = False
             db_user.save()
         except Exception as e:
+            print(e)
             return False
 
 
@@ -50,7 +58,7 @@ def userLogout(database, username, update_db=True):
 # @param update_db, 是否更新到数据库
 # @param session_key 会话id
 # @return 验证结果
-def userLoginCheck(database, user_id, user_name, password, token="", update_db=False, session_key=""):
+def userLoginCheck(database, user_id, user_name, password, token="", session_key=""):
     result = {"ok": False, "info": ""}
 
     # users = database.objects.all()
@@ -69,12 +77,12 @@ def userLoginCheck(database, user_id, user_name, password, token="", update_db=F
         result['info'] = "Error password or token"
         return result
 
-    if update_db:
-        print("update_db", session_key)
+    if session_key:
         db_user.session_key = session_key
         db_user.token = randomToken(20)  # 登录验证成功, 生成token并存储在数据库
+    else:
         db_user.is_online = True
-        db_user.save()  # 只有调用save后才会保存到数据库
+    db_user.save()  # 只有调用save后才会保存到数据库
 
     result['ok'] = True
     result['info'] = "Successed login"

@@ -144,15 +144,16 @@ STATIC_ROOT = os.path.join(BASE_DIR, "collectstatic")
 FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o755
 FILE_UPLOAD_PERMISSIONS = 0o644
 
-# 上传文件的根目录, django默认storage的路径
+# 上传文件的根目录, django默认本地storage的路径
+# 经数据库模型FileField字段保存的文件,默认情况下数据库只保存文件的相对MEDIA_ROOT路径名, 并将文件存储于本地
+# 修改DEFAULT_FILE_STORAGE可以全局控制数据库文件存储器, 目前django仅提供了本地存储方案且为默认
+# 用户可自行设计存储器并通过FileField中storage传参实现个性化
 MEDIA_ROOT = os.path.join(BASE_DIR, 'uploadfiles/')
 # django的admin默认使用该URL访问上传的文件,为保证后台能够正常查看文件, 此处直接写到了子路由
 MEDIA_URL = '/autodrive/upload/'  # 这个是在浏览器上访问上传文件的url的前缀
 
-AUTODRIVE_FILE_PATH = "/var/lib/mysql/files/autodrive/paths/"
-
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # 引擎（使用数据库作为引擎）
-SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # 是否关闭浏览器使得Session过期（默认）
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # 是否关闭浏览器使得Session过期（默认 False）
 SESSION_COOKIE_AGE = 1209600  # Session的cookie失效日期（2周）（默认1209600s）
 SESSION_COOKIE_NAME = "sessionid"  # Session的cookie保存在浏览器上时的key，即：sessionid＝随机字符串（默认）
 SESSION_COOKIE_PATH = "/"  # Session的cookie保存的路径（默认）

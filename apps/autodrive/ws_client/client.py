@@ -11,3 +11,6 @@ class Client:
         self.id = _id  # 客户端用户id
         self.ws = _ws  # 客户端websocket
         self.name = _name  # 客户端用户名称
+
+    def close(self):
+        self.ws.close()

@@ -6,8 +6,8 @@ from django.urls import path, re_path
 
 urlpatterns = [
     path('', views.main_page),
-    path('login/', views.login),
-    path('logout/', views.logout),
+    path('login/', views.login_page),
+    path('logout/', views.logout_page),
     path('test/', views.test_page),
 
     # re_path(r'^upload/(?P<path>.*)$', static.serve, {'document_root': settings.MEDIA_ROOT}, name='static'),

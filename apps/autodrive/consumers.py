@@ -13,7 +13,7 @@ from apps.autodrive.ws_client.carclient import CarClient
 from apps.autodrive.ws_client.webclient import UserClient
 
 from .models import CarUser, WebUser
-from .utils import userLoginCheck, userLogout
+from .utils import userLoginCheck, userLogout, debug_print
 
 g_car_clients = dict()  # user_id:  client_object
 g_user_clients = dict()  # user_id: client_object
@@ -29,7 +29,7 @@ class ClientConsumer(WebsocketConsumer):
     # 关闭连接, response: 关闭回应
     def closeConnect(self, response=None):
         if response:
-            print("closeConnect", response)
+            debug_print("closeConnect", response)
             self.send(response)
         self.close()
 
@@ -55,24 +55,25 @@ class ClientConsumer(WebsocketConsumer):
             if login_res['ok']:
                 responce["code"] = 0
                 responce["msg"] = login_res['info']
-                print("login check.", responce)
+                debug_print("login check.", responce)
                 self.send(json.dumps(responce))
             else:
                 responce["code"] = 1
                 responce["msg"] = login_res['info']
-                self.send(json.dumps(responce))
-                self.close()
+                self.closeConnect(json.dumps(responce))
                 return False
-            
+
             self.login_ok = True
             self.user_id = login_res['userid']
             self.user_name = login_res['username']
 
-            # 当前车辆是否在客户端列表, 无则添加
-            if self.user_id not in clients:
-                clients[self.user_id] = client_type(self.user_id, self.user_name, self)
-                print("new ws_client connect, id: %s, type: %s, total: %d" % (
-                    self.user_id, clients[self.user_id].type, len(clients)))
+            if self.user_id in clients:  # 用户已在列表, 断开历史连接
+                clients[self.user_id].ws.closeConnect('{"type": "rep_force_offline"}')  # 被迫下线
+
+            # 当前车辆是否在客户端列表, 有则覆盖, 无则添加
+            clients[self.user_id] = client_type(self.user_id, self.user_name, self)
+            debug_print("new ws_client connect, id: %s, type: %s, total: %d" % (
+                self.user_id, clients[self.user_id].type, len(clients)))
 
         # 调用子类登录成功‘回调函数’(如果有)
         on_login = getattr(self, "on_login", None)
@@ -86,9 +87,10 @@ class ClientConsumer(WebsocketConsumer):
         if self.login_ok and self.user_id in clients:
             client = clients.pop(self.user_id)
             print("user: %s logout, remaind %d %s users" % (self.user_id, len(clients), client.type))
-        userLogout(database, self.user_name)  # 在数据库中标注离线
+        userLogout(database, self.user_name, update_db=True)  # 在数据库中标注离线
         self.login_ok = False
         self.user_id = -1
+        self.closeConnect()
         # 调用子类注销成功‘回调函数’(如果有)
         on_logout = getattr(self, "on_logout", None)
         if on_logout:
@@ -126,10 +128,12 @@ class ClientConsumer(WebsocketConsumer):
         elif msg_type == "req_logout":  # 注销
             self.logout(database, clients)
         else:  # 其他消息类型
-            if self.login_ok:  # 已经登录
-                return msg_type, msg_dict  # 数据需继续处理
-            else:  # 尚未登录
+            if not self.login_ok:  # 未登录,非法访问
                 self.closeConnect("非法访问!")
+            elif clients.get(self.user_id) != self:  # 已被其他连接覆盖
+                self.closeConnect()
+            else:  # 已经登录
+                return msg_type, msg_dict  # 数据需继续处理
 
         return False, None  # 数据无需继续处理
 
@@ -203,9 +207,9 @@ class UserClientConsumer(ClientConsumer):
 
     # 重载父类方法
     def receive(self, text_data):
-        print("线程id: %d, 总线程数: %d" %(threading.currentThread().ident, len(threading.enumerate())))
+        debug_print("consumer线程id: %d, 总线程数: %d" % (threading.currentThread().ident, len(threading.enumerate())))
+        debug_print("ws_receive: ", text_data)
 
-        print("ws_receive: ", text_data)
         response = {"type": "", "msg": ""}
         msg_type, msg = self.preprocesse(text_data, WebUser, g_user_clients, UserClient)
         if not msg_type:

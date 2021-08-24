@@ -32,6 +32,9 @@ class User(models.Model):
 
 class CarUser(User):
     type = models.CharField('用户类型', max_length=10, default=User.CarType, choices=((User.CarType, User.CarType),), editable=False)
+    longitude = models.FloatField('经度', default=0.0)
+    latitude = models.FloatField('纬度', default=0.0)
+    soc = models.IntegerField('剩余电量', default=-1)
 
 
 class WebUser(User):
@@ -69,6 +72,17 @@ class NavPathInfo(models.Model):
         # db_table = 'navpathinfo'  # 重命名数据库表名, 默认按照系统规则命名
         verbose_name = '导航路径'  # 用于admin后台显示的名字(单数), 否则为默认值
         verbose_name_plural = verbose_name
+
+    def pathfile_urls(self):
+        urls = []
+        if self.points_file.name:
+            # self.points_file.storage.base_url MEDIA_URL
+            # self.points_file.storage.base_location 文件存储根目录 MediaRoot/
+            # self.points_file.storage.location 文件存储根目录 MediaRoot
+            urls.append(self.points_file.storage.base_url+self.points_file.name)
+        if self.extend_file.name:
+            urls.append(self.points_file.storage.base_url + self.extend_file.name)
+        return urls
 
 
 # 数据库类目删除时,内部文件并未删除, 利用信号事件删除文件

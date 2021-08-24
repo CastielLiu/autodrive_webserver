@@ -1,0 +1,64 @@
+
+#r-result {
+    width: 100%;
+    font-size: 14px;
+    position: absolute;
+    top: 10px;
+    left: 200px;
+}
+
+
+
+.info_ul {
+    margin: 0 0 5px 0;
+    padding: 0.2em 0;
+}
+
+.info_ui_img {
+    background-image: url("images/error.png");
+    background-position: 97% 0%;
+    background-repeat: no-repeat;
+    background-size: 50px;
+}
+
+.info_ui_Nimg {
+    background-image: url("images/carNormal.png");
+    background-position: 97% 0%;
+    background-repeat: no-repeat;
+    background-size: 40px;
+}
+
+.info_li {
+    line-height: 26px;
+    font-size: 15px;
+    color: #0C8816;
+}
+
+.info_lierr {
+    line-height: 26px;
+    font-size: 15px;
+    color: #D81E06;
+    border: none;
+}
+
+.info_span {
+    width: 80px;
+    display: inline-block;
+}
+
+.btn {
+    width: 80px;
+    text-align: center;
+    height: 30px;
+    line-height: 30px;
+    border-radius: 5px;
+    cursor: pointer;
+    background-color: #D81E06;
+    color: #fff;
+    margin: 0 auto;
+}
+
+.ta-c {
+    text-align: center;
+    margin-top: 10px;
+}

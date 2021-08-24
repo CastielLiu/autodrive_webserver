@@ -42,8 +42,8 @@
 <form method="post" action="/helloworld/a_upload/" enctype="multipart/form-data">
     {% csrf_token %}
     <div class="form-group">
-        选择附件：<br>
-        <input type="file" name="myfiles" multiple=""> <br>
+        <label>选择附件：</label><input type="file" name="myfiles" multiple=""> <br>
+        <label>选择附件：</label><input type="file" name="myfiles1" multiple=""> <br>
     </div>
     <button type="submit" class="btn btn-default"> 上传</button>
     <br>
