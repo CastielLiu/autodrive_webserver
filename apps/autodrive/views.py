@@ -9,7 +9,7 @@ from django.contrib.staticfiles.views import serve
 
 from apps.autodrive.consumers import g_car_clients, g_user_clients
 import json
-from apps.autodrive.utils import userLoginCheck, debug_print, userLogout, pretty_floats
+from apps.autodrive.utils import userLoginCheck, debug_print, userLogout, pretty_floats, getValuesListByUserId
 from apps.autodrive.models import WebUser, CarUser, User, NavPathInfo
 from apps.autodrive.nodes.nav_path import *
 import zipfile
@@ -156,11 +156,11 @@ def main_page(request):
         response.set_cookie('userid', userid)
         response.set_cookie('token', token)
         return response
-    debug_print(request.body)
+    debug_print("%s" % str(request.body))
+
     reqest_body = json.loads(request.body)
     req_type = reqest_body.get("type", "")
     data = reqest_body.get("data", {})
-    debug_print("autodrive post req_type: ", req_type)
 
     # code默认0为成功, 其他根据type进行编码
     response = {"type": "", "code": 0, "msg": "", "data": {}}
@@ -245,20 +245,19 @@ def main_page(request):
         cars_pos = []
         carsid = data.get('cars_id', [])
         for carid in carsid:
-            try:
-                carObjs = CarUser.objects.filter(userid=carid)
-                if len(carObjs) == 0:
-                    continue
-                carObj = carObjs[0]
-                cars_pos.append({'car_id': carid, 'lat': carObj.latitude, 'lng': carObj.longitude,
-                                 'online': carObj.is_online})
-            except Exception as e:
-                pass
+            # carObjs = CarUser.objects.filter(userid=carid)
+            _data = getValuesListByUserId(CarUser, carid, "latitude", "longitude", "is_online")
+            if _data:
+                cars_pos.append({'car_id': carid, 'lat': _data[0], 'lng': _data[1],
+                                 'online': _data[2]})
+
+        cars_pos.append({'car_id': 'test_car', 'lat': 33.37287, 'lng': 120.15607,
+                         'online': False})
+
         if len(cars_pos):
             response['code'] = 0
         else:
             response['code'] = 1
-
         response['data'] = {'cars_pos': cars_pos}
         response_text = json.dumps(response)
     else:

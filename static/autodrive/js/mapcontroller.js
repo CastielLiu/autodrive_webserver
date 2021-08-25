@@ -28,7 +28,7 @@
         init: function(){
             // 初始化地图，设置中心点和显示级别
             //this.map.centerAndZoom(new BMap.Point(116.316967, 39.990748), 15);
-            this.map.centerAndZoom(new BMap.Point(118.822011, 31.892611), 17);
+            this.map.centerAndZoom(new BMap.Point(120.16575, 33.3794), 17);
 
             // 开启鼠标滚轮缩放功能, 仅对PC上有效
             this.map.enableScrollWheelZoom(true);
@@ -90,20 +90,21 @@
         },
 
         // 创建图标对象
-        addCarsMarker: function(cars) {
+        addCarsMarker: function(cars_pos) {
             _this = this;
-            //'cars': [{'id': xx, 'lat': xx, 'lng': xx}]
+            //'cars_pos': [{'car_id': xx, 'lat': xx, 'lng': xx, 'online': xx}]
             var point, marker;
             // 创建标注对象并添加到地图
-            for (var i = 0, pointsLen = cars.length; i < pointsLen; i++) {
+            for (var i = 0, pointsLen = cars_pos.length; i < pointsLen; i++) {
 
-                point = new BMap.Point(cars[i].lng, cars[i].lat);
+                point = new BMap.Point(cars_pos[i].lng, cars_pos[i].lat);
+//                console.log(point);
                 // 判断正常或者故障，根据不同装填显示不同Icon
-                var myIcon = new BMap.Icon("static/imgs/normal.png", new BMap.Size(32, 32), {
+                var myIcon = new BMap.Icon("/static/autodrive/imgs/normal.png", new BMap.Size(32, 32), {
                         // 指定定位位置
                         offset: new BMap.Size(16, 32),
                         // 当需要从一幅较大的图片中截取某部分作为标注图标时，需要指定大图的偏移位置
-                        //imageOffset: new BMap.Size(0, -12 * 25)
+                        // imageOffset: new BMap.Size(0, -12 * 25)
                     });
                 // 创建一个图像标注实例
                 marker = new BMap.Marker(point, {
@@ -111,47 +112,50 @@
                 });
                 // 将覆盖物添加到地图上
                 this.map.addOverlay(marker);
+                this.map.centerAndZoom(point, 17);
 
                 //给标注点添加点击事件
-                marker.addEventListener("click", function() {
-                    _this.showInfo(this, cars[i]);
-                });
+//                marker.addEventListener("click", function() {
+//                    _this.showInfo(this, cars_pos[i]);
+//                });
+                this.showInfo(marker, cars_pos[i]);
             }
         },
 
         //显示信息窗口，显示标注点的信息
-        showInfo: function(thisMaker, car) {
-            var sContent = '';
-                sContent += '<ul class="info_ul info_ui_Nimg">';
-                sContent += '   <li class="info_li">';
-                sContent += '       <span class="info_span">车辆ID：</span>';
-                sContent += '       <span>' + car.id + '</span>';
-                sContent += '   </li>';
-                sContent += '   <li class="info_li">';
-                sContent += '       <span class="info_span">车辆名称：</span>';
-                sContent += '       <span>' + car.name + '</span>';
-                sContent += '   </li>';
-                sContent += '   <li class="info_li">';
-                sContent += '       <span class="info_span">车辆速度：</span>';
-                sContent += '       <span>' + car.speed + '</span>';
-                sContent += '   </li>';
-                sContent += '</ul>';
+        showInfo: function(thisMaker, car_pos) {
+//            var sContent = '';
+//                sContent += '<ul class="info_ul info_ui_Nimg">';
+//                sContent += '   <li class="info_li">';
+//                sContent += '       <span class="info_span">车辆ID：</span>';
+//                sContent += '       <span>' + car_pos.car_id + '</span>';
+//                sContent += '   </li>';
+//                sContent += '</ul>';
+            sContent = "车辆ID:" + car_pos.car_id + "<br>速度: 0.0km/h";
+            var opts = {
+                width: 120, // 信息窗口宽度
+                height: 125, // 信息窗口高度
+                title: '<h>'+'测试标题'+'</h>', // 信息窗口标题
+                enableMessage: false, //设置允许信息窗发送短息
+                message: ""
+			}
             // 创建信息窗口对象
-            var infoWindow = new BMap.InfoWindow(sContent);
-
-            //图片加载完毕重绘infowindow
-            thisMaker.openInfoWindow(infoWindow);
+            var infoWindow = new BMap.InfoWindow(sContent, opts);
+//            thisMaker.openInfoWindow(infoWindow); //开启信息窗口
+            // 添加点击事件
+            thisMaker.addEventListener("click", function() {
+                thisMaker.openInfoWindow(infoWindow); //开启信息窗口
+            });
         },
-
 
         // 弹窗增加点击事件
 //        function func(data) {
 //            alert("点击了机器编号为：" + data + "\n");
 //        }
 
-        addLine: function(pointArr) {
+        addPathLine: function(pointArr) {
             // 使用浏览器的矢量图制图工具，在地图上绘制折线的地图叠加层
-            var polyline = new BMap.Polyline(pointArr.path, {
+            var polyline = new BMap.Polyline(pointArr, {
                 strokeColor: "#0C8816",
                 // strokeColor: "blue",
                 strokeWeight: 3,
@@ -163,14 +167,14 @@
             this.map.addOverlay(polyline);
 
             //
-            for (var i = 0, j = pointArr.path.length; i < j; i++) {
+            for (var i = 0, j = pointArr.length; i < j; i++) {
 
-                myIcon = new BMap.Icon("static/images/normal.png", new BMap.Size(32, 32), {
+                myIcon = new BMap.Icon("/static/autodrive/imgs/normal.png", new BMap.Size(32, 32), {
                     // 指定定位位置
                     offset: new BMap.Size(10, 32),
                 });
                 // console.log(pointArr.path[i]);
-                var point = new BMap.Point(pointArr.path[i].lng,pointArr.path[i].lat)
+                var point = new BMap.Point(pointArr[i].lng,pointArr[i].lat)
                 // var point = new BMap.Point(116.324045, 39.987984);
                 var marker = new BMap.Marker(point, {
                     icon: myIcon

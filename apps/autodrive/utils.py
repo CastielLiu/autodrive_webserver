@@ -1,14 +1,14 @@
 from functools import partial
 from django.conf import settings
-from django.db.models import Q, F
+from django.db.models import Q, F, QuerySet
 from random import Random
 import string
 
 
-# 自定义调试打印函数
-def debug_print(self, *args, **kwargs):
+# 自定义调试打印函数  def print(self, *args, sep=' ', end='\n', file=None)
+def debug_print(self, *args, sep=' ', end='\n', file=None):
     if settings.DEBUG:
-        print(self, args, kwargs)
+        print(self, args, sep=sep, end=end, file=file)
 
 
 def pretty_floats(obj, cnt):
@@ -95,3 +95,15 @@ def userLoginCheck(database, user_id, user_name, password, token="", session_key
         result['is_super'] = db_user.is_super
     return result
 
+
+# @brief 查询某用户的部分数据
+# @param db 数据库
+# @param userid 用户id
+# @return values_list tuple
+def getValuesListByUserId(db, userid, *args):
+    try:
+        return db.objects.values_list(*args).get(userid=userid)  # tuple
+        # return db.objects.values_list(args).get(userid=userid)  # dict
+    except Exception as e:
+        print(e)
+        return None

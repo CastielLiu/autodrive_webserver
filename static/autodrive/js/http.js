@@ -110,7 +110,25 @@ function requestCarsPosition(){
             code = dict.code;
             msg = "";
             if(code === 0){
-                window.mapctrler.addCarsMarker(dict.data.cars);
+                window.mapctrler.addCarsMarker(dict.data.cars_pos);
+            }
+        }
+    });
+}
+
+//请求获取路径轨迹
+function requestPathLine(pathid){
+
+    HttpRequest2({
+        cmd: {"type":"req_path_line", "data": {"path_id": pathid}},
+        url: "",
+        done: function(data){
+            dict = JSON.parse(data);
+            type = dict.type;
+            code = dict.code;
+            msg = "";
+            if(code === 0){
+                window.mapctrler.addPathLine(dict.data.points);
             }
         }
     });

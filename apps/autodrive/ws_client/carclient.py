@@ -13,6 +13,8 @@ class CarState:
         self.mode = None
         self.longitude = None
         self.latitude = None
+        self.x = None
+        self.y = None
 
     # 获取车辆状态数据字典
     def data(self):

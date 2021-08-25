@@ -130,12 +130,14 @@ class ClientConsumer(WebsocketConsumer):
         else:  # 其他消息类型
             if not self.login_ok:  # 未登录,非法访问
                 self.closeConnect("非法访问!")
-            elif clients.get(self.user_id) != self:  # 已被其他连接覆盖
+            # 记录的websocket 与当前websocket不同时
+            # 已被其他连接覆盖(关键)
+            elif clients.get(self.user_id).ws != self:
                 self.closeConnect()
             else:  # 已经登录
                 return msg_type, msg_dict  # 数据需继续处理
 
-        return False, None  # 数据无需继续处理
+        return None, None  # 数据无需继续处理
 
 
 # 车端客户端数据消费者
@@ -152,16 +154,31 @@ class CarClientsConsumer(ClientConsumer):
 
     # 重载父类方法
     def receive(self, text_data):
-        print("ws_receive: ", text_data)
+        # print("ws_receive: ", text_data)
         msg_type, msg = self.preprocesse(text_data, CarUser, g_car_clients, CarClient)
-        if not msg_type:
+        if msg_type is None:
             return
-
         if msg_type == "rep_car_state":
             client = g_car_clients[self.user_id]
             client.state.speed = msg.get("speed", None)
             client.state.steer_angle = msg.get("steer_angle", None)
             client.state.mode = msg.get("mode", None)
+            client.state.longitude = msg.get("lng", None)
+            client.state.latitude = msg.get("lat", None)
+
+            # 控制数据写数据库的频率
+            now = time.time()
+            if not hasattr(self, "last_data_save_time") or now - self.last_data_save_time > 1.0:
+                try:
+                    # 将部分数据存到数据库
+                    car_user = CarUser.objects.get(userid=client.id)
+                    car_user.longitude = client.state.longitude
+                    car_user.latitude = client.state.latitude
+                    car_user.save()
+                    self.last_data_save_time = now
+                except Exception as e:
+                    print(e)
+                    pass
 
     def on_login(self):
         pass
@@ -208,11 +225,11 @@ class UserClientConsumer(ClientConsumer):
     # 重载父类方法
     def receive(self, text_data):
         debug_print("consumer线程id: %d, 总线程数: %d" % (threading.currentThread().ident, len(threading.enumerate())))
-        debug_print("ws_receive: ", text_data)
+        # debug_print("ws_receive: ", text_data)
 
         response = {"type": "", "msg": ""}
         msg_type, msg = self.preprocesse(text_data, WebUser, g_user_clients, UserClient)
-        if not msg_type:
+        if msg_type is None:
             return
 
         if msg_type == "req_online_car":  # 请求获取在线车辆列表
