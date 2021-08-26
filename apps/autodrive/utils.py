@@ -6,7 +6,7 @@ import string
 
 
 # 自定义调试打印函数  def print(self, *args, sep=' ', end='\n', file=None)
-def debug_print(self, *args, sep=' ', end='\n', file=None):
+def debug_print(self, *args, sep=' ', end='\n', file=None) -> object:
     if settings.DEBUG:
         print(self, args, sep=sep, end=end, file=file)
 

@@ -116,23 +116,6 @@ function requestCarsPosition(){
     });
 }
 
-//请求获取路径轨迹
-function requestPathLine(pathid){
-
-    HttpRequest2({
-        cmd: {"type":"req_path_line", "data": {"path_id": pathid}},
-        url: "",
-        done: function(data){
-            dict = JSON.parse(data);
-            type = dict.type;
-            code = dict.code;
-            msg = "";
-            if(code === 0){
-                window.mapctrler.addPathLine(dict.data.points);
-            }
-        }
-    });
-}
 
 //请求监听车辆信息
 function requestListenCars(car_id){
@@ -166,12 +149,19 @@ function requestPathList(group){
     });
 }
 
+//请求获取路径轨迹
 function requestPathTraj(pathid){
     HttpRequest({
-        cmd: {"type":"req_path_traj", "data": {"pathid": pathid}},
+        cmd: {"type":"req_path_traj", "data": {"path_id": pathid}},
         url: "",
         done: function(data){
             dict = JSON.parse(data);
-        }
+            type = dict.type;
+            code = dict.code;
+            msg = "";
+            if(code === 0){
+                window.mapctrler.addPathLine(dict.data.points);
+            }
+        },
     });
 }

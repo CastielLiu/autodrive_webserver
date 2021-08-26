@@ -208,14 +208,15 @@ def main_page(request):
         response_text = json.dumps(response, ensure_ascii=False)  # ensure_ascii=False 允许中文编码
     elif req_type == "req_path_traj":  # 获取路径轨迹
         response['type'] = 'res_path_traj'
-        pathid = data.get('pathid', -1)
+        pathid = data.get('path_id', -1)
 
+        # {'id': xx, 'name': xx, 'points': [{'lng': xx, 'lat': xx},{}]}
         ok, msg, path = getNavPathTraj(usergroup, pathid)
         if not ok:
             response['code'] = 1
             response['msg'] = msg
         else:
-            response['data'] = {"path": path}
+            response['data'] = path  # {"path": path}
         # json.encoder.FLOAT_REPR = lambda x: format(x, '.2f')  #json为浮点数保留一定位数, 当优化器存在时无效
         # print(pretty_floats(response, 5))
         response_text = json.dumps(pretty_floats(response, 5), ensure_ascii=False)

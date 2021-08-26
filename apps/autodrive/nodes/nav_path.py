@@ -3,6 +3,8 @@
 from apps.autodrive.models import NavPathInfo
 from django.db.models import Q, F
 
+from apps.autodrive.utils import debug_print
+
 
 def gen_test_trajectory(_id=0, _name="path1"):
     start_point = (33.3794, 120.16574722)
@@ -43,11 +45,15 @@ def getAvailbalePaths(group_name):
 # @param group_name 获取组内路径
 # @param path_id 路径ID
 def getNavPathTraj(group_name, path_id):
-    navpaths = NavPathInfo.objects.filter(Q(id=path_id) & Q(uploader__group__name=group_name) & Q(is_active=True))
-    if navpaths.count() == 0:
-        return False, "Path not exist", None
+    try:
+        debug_print("getNavPathTraj path_id:%d, group_name:%s" % (path_id, group_name))
+        navpaths = NavPathInfo.objects.filter(Q(id=path_id) & Q(uploader__group__name=group_name) & Q(is_active=True))
+        if navpaths.count() == 0:
+            return False, "Path not exist", None
+        navpath = navpaths[0]
+    except Exception as e:
+        return False, "Qurey Path failed", None
 
-    navpath = navpaths[0]
     path_result = {'id': path_id, 'name': navpath.name, 'points': []}
 
     try:

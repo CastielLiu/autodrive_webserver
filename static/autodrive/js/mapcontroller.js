@@ -165,7 +165,7 @@
 
             // 将覆盖物（线）添加到地图上
             this.map.addOverlay(polyline);
-
+            console.log(pointArr)
             //
             for (var i = 0, j = pointArr.length; i < j; i++) {
 
