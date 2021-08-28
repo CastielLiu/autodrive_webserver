@@ -15,8 +15,9 @@ from apps.autodrive.ws_client.webclient import UserClient
 from .models import CarUser, WebUser
 from .utils import userLoginCheck, userLogout, debug_print
 
-g_car_clients = dict()  # user_id:  client_object
-g_user_clients = dict()  # user_id: client_object
+
+g_car_clients = dict()  # user_id:  client_object(用户信息+ws)
+g_user_clients = dict()  # user_id: client_object(用户信息+ws)
 
 
 # 客户端消费者基类
@@ -25,6 +26,7 @@ class ClientConsumer(WebsocketConsumer):
     user_name = None
     token = ""
     login_ok = False
+    client = None
 
     # 关闭连接, response: 关闭回应
     def closeConnect(self, response=None):
@@ -71,7 +73,7 @@ class ClientConsumer(WebsocketConsumer):
                 clients[self.user_id].ws.closeConnect('{"type": "rep_force_offline"}')  # 被迫下线
 
             # 当前车辆是否在客户端列表, 有则覆盖, 无则添加
-            clients[self.user_id] = client_type(self.user_id, self.user_name, self)
+            clients[self.user_id] = self.client = client_type(self.user_id, self.user_name, self)
             debug_print("new ws_client connect, id: %s, type: %s, total: %d" % (
                 self.user_id, clients[self.user_id].type, len(clients)))
 
@@ -179,6 +181,13 @@ class CarClientsConsumer(ClientConsumer):
                 except Exception as e:
                     print(e)
                     pass
+        elif msg_type == "res_task":  # 车端回应任务请求
+            self.client.reqest_task.cv.acquire()
+            self.client.reqest_task.response = text_data
+            self.client.reqest_task.cv.notify()
+            self.client.reqest_task.cv.release()
+
+
 
     def on_login(self):
         pass

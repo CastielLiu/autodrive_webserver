@@ -73,6 +73,7 @@ class NavPathInfo(models.Model):
         verbose_name = '导航路径'  # 用于admin后台显示的名字(单数), 否则为默认值
         verbose_name_plural = verbose_name
 
+    # 路径文件的url集合
     def pathfile_urls(self):
         urls = []
         if self.points_file.name:

@@ -9,7 +9,8 @@ from django.contrib.staticfiles.views import serve
 
 from apps.autodrive.consumers import g_car_clients, g_user_clients
 import json
-from apps.autodrive.utils import userLoginCheck, debug_print, userLogout, pretty_floats, getValuesListByUserId
+from apps.autodrive.utils import userLoginCheck, debug_print, userLogout, pretty_floats, queryValuesListByUserId, \
+    transmitFromHttpToWebsocket
 from apps.autodrive.models import WebUser, CarUser, User, NavPathInfo
 from apps.autodrive.nodes.nav_path import *
 import zipfile
@@ -164,7 +165,7 @@ def main_page(request):
 
     # code默认0为成功, 其他根据type进行编码
     response = {"type": "", "code": 0, "msg": "", "data": {}}
-    response_text = ""
+    response_text = None
 
     if req_type == "req_online_car":  # 请求获取(组内)在线车辆列表
         response['type'] = 'res_online_car'
@@ -195,7 +196,6 @@ def main_page(request):
             #     cars.append({"id": car_id, "name": car_client.name})
 
             response["data"] = {"cars": cars}
-        response_text = json.dumps(response)
         # "data": {"cars": [{"id": x, "name": x}]}
     elif req_type == "req_path_list":  # 请求获取路径列表
         response['type'] = 'res_path_list'
@@ -239,15 +239,14 @@ def main_page(request):
                     response['msg'] = "No path files"
                 else:
                     response['code'] = 0
-                    response['data'] = {"path_urls": path_urls, "path_name": navpath.name}
-        response_text = json.dumps(response)
+                    response['data'] = {"path_urls": path_urls, "path_name": navpath.name, "path_id": pathid}
     elif req_type == "req_cars_pos":
         response['type'] = 'res_cars_pos'
         cars_pos = []
         carsid = data.get('cars_id', [])
         for carid in carsid:
             # carObjs = CarUser.objects.filter(userid=carid)
-            _data = getValuesListByUserId(CarUser, carid, "latitude", "longitude", "is_online")
+            _data = queryValuesListByUserId(CarUser, carid, "latitude", "longitude", "is_online")
             if _data:
                 cars_pos.append({'car_id': carid, 'lat': _data[0], 'lng': _data[1],
                                  'online': _data[2]})
@@ -260,10 +259,44 @@ def main_page(request):
         else:
             response['code'] = 1
         response['data'] = {'cars_pos': cars_pos}
-        response_text = json.dumps(response)
+    elif req_type == "req_task":
+        response['type'] = 'res_task'
+        car_id = data.get('car_id')
+        car_client = g_car_clients.get(car_id)
+        if car_client is None:
+            response['code'] = 1  # 当前车辆不在线
+            response['msg'] = "Car offline"
+        else:
+            request_task = car_client.reqest_task
+            request_task.cv.acquire()
+            try:
+                car_client.ws.send(bytes_data=request.body)  # 将http请求指令经ws转发到车端
+            except Exception as e:
+                debug_print("ws req_task err: ", e)
+                response['code'] = 1  # 当前车辆不在线
+                response['msg'] = "Car communication error"
+            else:
+                if request_task.cv.wait(10.0):  # 等待10s
+                    response_text = request_task.response
+                else:
+                    response['code'] = 1
+                    response['msg'] = "Request timeout in server"
+            request_task.cv.release()
+
+    elif req_type == "req_stop_task":
+        response['type'] = 'res_stop_task'
+        car_id = data.get('car_id')
+        ok, result = transmitFromHttpToWebsocket(g_car_clients, car_id, request.body)
+        if not ok:
+            response['code'] = 1
+            response['msg'] = result
+        else:
+            response_text = result
     else:
         response['code'] = 1
         response['msg'] = "Unknown request."
+
+    if response_text is None:
         response_text = json.dumps(response)
     debug_print(response_text)
     return HttpResponse(response_text)

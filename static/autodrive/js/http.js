@@ -5,14 +5,15 @@ function HttpRequest2(obj) {
         // csrf防御请求头
         'X-CSRFToken': tools.getCookie('csrftoken'),
     };
-
+    console.log(typeof(obj.async)=="undefined");
+    console.log(obj.async || true);
     return $.ajax({
         url: obj.url || "",
         type: obj.type || 'POST',
         headers: headers,
-        async: obj.async || true,
+        async: typeof(obj.async)=="undefined" ? true : obj.async,
+        timeout: typeof(obj.timeout)=="undefined" ? 0 : obj.timeout,
         dataType: obj.dataType || '',
-        timeout:90000,
         data: JSON.stringify(obj.cmd),
 
         success: function(data, status, xhr){
@@ -25,6 +26,8 @@ function HttpRequest2(obj) {
                 obj.done(data);
             }
         },
+        // 请求成功失败都会执行complete
+        complete: obj.complete || function(xhr, status){},
     })
 };
 
@@ -161,6 +164,7 @@ function requestPathTraj(pathid){
             msg = "";
             if(code === 0){
                 window.mapctrler.addPathLine(dict.data.points);
+                window.mapctrler.setZoom(dict.data.points);
             }
         },
     });

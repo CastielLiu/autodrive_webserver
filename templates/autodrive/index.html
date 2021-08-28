@@ -9,6 +9,7 @@
     <link rel="stylesheet" type="text/css" href="/static/autodrive/css/dashboard.css">
     <link rel="stylesheet" type="text/css" href="/static/autodrive/css/responsive.css">
     <link rel="stylesheet" type="text/css" href="/static/autodrive/css/layout.css">
+    <link rel="stylesheet" type="text/css" href="/static/autodrive/css/index.css">
     <link rel="stylesheet" type="text/css" href="/static/autodrive/css/baidumap.css">
 
     <!--引入jquery 不能使用<script /> ,只能使用<script  ></script>-->
@@ -33,22 +34,42 @@
 <!-- END Header -->
 <div id="main_container"><!-- main Container -->
     <div id="menu_container" >
-        <p>
-            <input type="button" id="getPathListBtn" value="刷新路径列表"> </input>
-            <select id="pathList">
-                <option value="empty">--------</option>
-            </select>
-        </p>
-        <p>
-            <input type="button" id="getPathBtn" value="获取路径点"> </input>
-        </p>
+
         <input type="button" id="wsTestBtn" value="ws测试" hidden> </input>
 
         <div id="online-cars">
             车辆列表:  <input type="button" value="刷新" id="flush_online_cars"></input>
             <div id="cars_list" class="cars_list"></div>
         </div>
+        </br>
+
+        <div id='task-msgBox' class="msgBox">
+            <h1 align="center">车辆控制</h1>
+            <p>目标车辆: <input type="text" id="taskCarId" disabled="disabled"/></p>
+            <p>当前状态: <input type="text" id="taskCarState" value="unknown" disabled="disabled"/></p>
+            <p>目标路径:
+                <select id="pathList">
+                    <option value="empty">--------</option>
+                </select>
+                <input type="button" id="getPathListBtn" value="刷新"> </input>
+                <input type="button" id="getPathBtn" value="查看"> </input>
+            </p>
+            <p>目标速度:
+                <select id="taskTargetSpeedList">
+                    <option value="3">3km/h</option>
+                    <option value="5">5km/h</option>
+                    <option value="10">10km/h</option>
+                </select>
+            </p>
+            <div>
+                <input type="button" id="stopCurrentTask"  value="终止当前任务">
+                <input type="button" id="startNewTask"  value="启动新任务">
+                <input type="button" id="closeMsgBox" value="关闭">
+            </div>
+            <p id="msgBoxInfomation"></p>
+        </div>
     </div>
+
     <!-- 地图盒子 -->
     <div id="baidumap_container" class="map">
         <!-- 百度地图API -->

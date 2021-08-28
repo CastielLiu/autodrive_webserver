@@ -1,0 +1,49 @@
+
+@import url(base.css);
+
+div#main_container{
+    position: relative;  /*relative, absolute*/
+    width: 100%;
+    height: 93%;
+    display: flex;
+    top: 0px;
+    bottom: 0px;
+}
+
+/* 左侧菜单栏 */
+div#menu_container{
+    padding: 5px;
+    width: 350px;
+    height: 100%;
+    /*background-color: #7ecff2;*/
+    text-align: left;
+}
+
+div#baidumap_container{
+    padding: 5px;
+    flex: 1;
+    /*background-color: #ff5000;*/
+    text-align: center;
+}
+
+div#other_container{
+    padding: 5px;
+    width: 300px;
+    background-color: #ffffff;
+    text-align: left;
+}
+
+.msgBox{
+    width:auto;
+    margin-top:10px;
+    margin:auto;
+    padding:10px;
+    height:auto;
+    border:1px #111 solid;
+
+    display:none;            /* 默认对话框隐藏 */
+}
+
+#task-msgBox{
+
+}

@@ -100,10 +100,38 @@ def userLoginCheck(database, user_id, user_name, password, token="", session_key
 # @param db 数据库
 # @param userid 用户id
 # @return values_list tuple
-def getValuesListByUserId(db, userid, *args):
+def queryValuesListByUserId(db, userid, *args):
     try:
         return db.objects.values_list(*args).get(userid=userid)  # tuple
         # return db.objects.values_list(args).get(userid=userid)  # dict
     except Exception as e:
         print(e)
         return None
+
+
+# @brief 将http请求转发经websocket转发到车端
+# @param clients 车辆用户列表
+# @param car_id 车辆ID
+# @param sync 是否同步
+# @return res是否成功, 错误消息/响应内容
+def transmitFromHttpToWebsocket(clients, car_id, content, sync=True):
+    car_client = clients.get(car_id)
+    if car_client is None:
+        return False, "Car offline"
+
+    request_task = car_client.reqest_task
+    request_task.cv.acquire()
+    try:
+        car_client.ws.send(bytes_data=content)  # 将http请求指令经ws转发到车端
+    except Exception as e:
+        debug_print("ws req_task err: ", e)
+        return False, "Car communication error"
+
+    if request_task.cv.wait(10.0):  # 等待10s
+        response_text = request_task.response
+    else:
+        return False, "Request timeout in server"
+    request_task.cv.release()
+    return True, response_text
+
+

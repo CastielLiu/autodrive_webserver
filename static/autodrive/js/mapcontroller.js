@@ -107,45 +107,31 @@
                         // imageOffset: new BMap.Size(0, -12 * 25)
                     });
                 // 创建一个图像标注实例
-                marker = new BMap.Marker(point, {
+                var marker = new BMap.Marker(point, {
                     icon: myIcon
                 });
                 // 将覆盖物添加到地图上
                 this.map.addOverlay(marker);
                 this.map.centerAndZoom(point, 17);
 
-                //给标注点添加点击事件
-//                marker.addEventListener("click", function() {
-//                    _this.showInfo(this, cars_pos[i]);
-//                });
-                this.showInfo(marker, cars_pos[i]);
-            }
-        },
+//                this.showInfo(marker, cars_pos[i]);
 
-        //显示信息窗口，显示标注点的信息
-        showInfo: function(thisMaker, car_pos) {
-//            var sContent = '';
-//                sContent += '<ul class="info_ul info_ui_Nimg">';
-//                sContent += '   <li class="info_li">';
-//                sContent += '       <span class="info_span">车辆ID：</span>';
-//                sContent += '       <span>' + car_pos.car_id + '</span>';
-//                sContent += '   </li>';
-//                sContent += '</ul>';
-            sContent = "车辆ID:" + car_pos.car_id + "<br>速度: 0.0km/h";
-            var opts = {
-                width: 120, // 信息窗口宽度
-                height: 125, // 信息窗口高度
-                title: '<h>'+'测试标题'+'</h>', // 信息窗口标题
-                enableMessage: false, //设置允许信息窗发送短息
-                message: ""
-			}
-            // 创建信息窗口对象
-            var infoWindow = new BMap.InfoWindow(sContent, opts);
-//            thisMaker.openInfoWindow(infoWindow); //开启信息窗口
-            // 添加点击事件
-            thisMaker.addEventListener("click", function() {
-                thisMaker.openInfoWindow(infoWindow); //开启信息窗口
-            });
+                var sContent = "车辆ID:" + cars_pos[i].car_id + "<br>速度: 0.0km/h";
+                var opts = {
+                    width: 120, // 信息窗口宽度
+                    height: 125, // 信息窗口高度
+                    title: '<h>'+'测试标题'+'</h>', // 信息窗口标题
+                    enableMessage: false, //设置允许信息窗发送短息
+                    message: ""
+                }
+                // 创建信息窗口对象
+                var infoWindow = new BMap.InfoWindow(sContent, opts);
+    //            thisMaker.openInfoWindow(infoWindow); //开启信息窗口
+                // 添加点击事件
+                marker.addEventListener("click", function() {
+                    marker.openInfoWindow(infoWindow); //开启信息窗口
+                });
+            }
         },
 
         // 弹窗增加点击事件
@@ -165,29 +151,31 @@
 
             // 将覆盖物（线）添加到地图上
             this.map.addOverlay(polyline);
-            console.log(pointArr)
-            //
-            for (var i = 0, j = pointArr.length; i < j; i++) {
+//            console.log(pointArr)
 
-                myIcon = new BMap.Icon("/static/autodrive/imgs/normal.png", new BMap.Size(32, 32), {
-                    // 指定定位位置
-                    offset: new BMap.Size(10, 32),
-                });
-                // console.log(pointArr.path[i]);
-                var point = new BMap.Point(pointArr[i].lng,pointArr[i].lat)
-                // var point = new BMap.Point(116.324045, 39.987984);
-                var marker = new BMap.Marker(point, {
-                    icon: myIcon
-                });
-
-                this.map.addOverlay(marker);
-            };
+//            //在每个离散点上添加图标
+//            for (var i = 0, len = pointArr.length; i < len; i++) {
+//
+//                myIcon = new BMap.Icon("/static/autodrive/imgs/normal.png", new BMap.Size(32, 32), {
+//                    // 指定定位位置
+//                    offset: new BMap.Size(10, 32),
+//                });
+//                // console.log(pointArr.path[i]);
+//                var point = new BMap.Point(pointArr[i].lng,pointArr[i].lat)
+//                // var point = new BMap.Point(116.324045, 39.987984);
+//                var marker = new BMap.Marker(point, {
+//                    icon: myIcon
+//                });
+//
+//                this.map.addOverlay(marker);
+//            };
         },
 
         //根据经纬极值计算绽放级别
         getZoom: function(maxLng, minLng, maxLat, minLat) {
             // 级别18到3。
-            var zoom = ["50", "100", "200", "500", "1000", "2000", "5000", "10000", "20000", "25000", "50000", "100000", "200000", "500000", "1000000", "2000000"];
+            var zoom = ["50", "100", "200", "500", "1000", "2000", "5000", "10000", "20000",
+                        "25000", "50000", "100000", "200000", "500000", "1000000", "2000000"];
             // 创建点坐标A
             var pointA = new BMap.Point(maxLng, maxLat);
             // 创建点坐标B
@@ -197,7 +185,7 @@
             for (var i = 0, zoomLen = zoom.length; i < zoomLen; i++) {
                 if (zoom[i] - distance > 0) {
                     //之所以会多3，是因为地图范围常常是比例尺距离的10倍以上。所以级别会增加3。
-                    return 18 - i + 3;
+                    return 18 - i + 4;
                 }
             }
         },
@@ -219,7 +207,7 @@
                 }
                 var cenLng = (parseFloat(maxLng) + parseFloat(minLng)) / 2;
                 var cenLat = (parseFloat(maxLat) + parseFloat(minLat)) / 2;
-                var zoom = getZoom(maxLng, minLng, maxLat, minLat);
+                var zoom = this.getZoom(maxLng, minLng, maxLat, minLat);
                 this.map.centerAndZoom(new BMap.Point(cenLng, cenLat), zoom);
             } else {
                 this.map.centerAndZoom(new BMap.Point(116.316967, 39.990748), 15);

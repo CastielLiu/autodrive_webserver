@@ -1,5 +1,6 @@
 # 车辆客户端
 import json
+import threading
 
 from .client import Client
 
@@ -31,11 +32,19 @@ class CarState:
         return json.dumps(self.data())
 
 
+# 请求执行任务
+class RequestTask:
+    def __init__(self):
+        self.cv = threading.Condition()  # 请求执行任务的条件变量
+        self.response = None
+
+
 # 车辆客户端
 class CarClient(Client):
     def __init__(self, car_id, car_name, ws):
         Client.__init__(self, "car", car_id, car_name, ws)
         self.state = CarState()
+        self.reqest_task = RequestTask()
 
     # 获取车辆实时数据
     def reltimedata(self, attrs):
