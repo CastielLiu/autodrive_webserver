@@ -121,12 +121,13 @@
                 var object = $(this);
                 object.siblings().hide();
                 object.attr('disabled',true);
-                $("#msgBoxInfomation").html("正在启动新任务，请稍等...");
+                var msgTextObj = $("#msgBoxInfomation");
+                msgTextObj.html("正在启动新任务，请稍等...");
                 var carid = $('#taskCarId').val();
                 var targetPathid = $("#pathList option:selected").val();
                 var targetSpeed = $("#taskTargetSpeedList option:selected").val();
                 HttpRequest2({
-                    cmd: {"type":"req_task", "data": {"car_id": carid, "path_id": targetPathid, "speed": targetSpeed}},
+                    cmd: {"type":"req_start_task", "data": {"car_id": carid, "path_id": targetPathid, "speed": targetSpeed}},
                     url: "",
                     timeout: 10000, //10s
                     async: true,  //async 为false时表示同步, 将导致html页面不更新
@@ -138,15 +139,17 @@
                         msg = dict.msg;
                         console.log(data);
                         if(code === 0){
-                            $("#msgBoxInfomation").html("任务启动成功！");//;
+                            msgTextObj.html("任务启动成功！");//;
                         }
                         else{
-                            $("#msgBoxInfomation").html("任务启动失败: "+msg);//;
+                            msgTextObj.html("任务启动失败: "+msg);//;
                         }
                     },
-                    complete: function(data){
+                    complete: function(xhr, status){
                         object.attr('disabled', false);
                         object.siblings().show();
+                        if(status == 'timeout')
+                            msgTextObj.html("请求超时");
                     },
                 });
             });
@@ -181,6 +184,7 @@
                         object.siblings().show();
                         if(status == 'timeout')
                             msgTextObj.html("请求超时");
+
                     },
                 });
             });

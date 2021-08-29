@@ -156,7 +156,7 @@ class CarClientsConsumer(ClientConsumer):
 
     # 重载父类方法
     def receive(self, text_data):
-        # print("ws_receive: ", text_data)
+        debug_print("ws_receive: ", text_data)
         msg_type, msg = self.preprocesse(text_data, CarUser, g_car_clients, CarClient)
         if msg_type is None:
             return
@@ -181,12 +181,13 @@ class CarClientsConsumer(ClientConsumer):
                 except Exception as e:
                     print(e)
                     pass
-        elif msg_type == "res_task":  # 车端回应任务请求
+        # 车端回应任务请求
+        elif msg_type == "res_start_task" or \
+                msg_type == "res_stop_task":  # 车端回应任务请求
             self.client.reqest_task.cv.acquire()
             self.client.reqest_task.response = text_data
             self.client.reqest_task.cv.notify()
             self.client.reqest_task.cv.release()
-
 
 
     def on_login(self):

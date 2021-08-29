@@ -259,8 +259,8 @@ def main_page(request):
         else:
             response['code'] = 1
         response['data'] = {'cars_pos': cars_pos}
-    elif req_type == "req_task":
-        response['type'] = 'res_task'
+    elif req_type == "req_start_task":
+        response['type'] = 'res_start_task'
         car_id = data.get('car_id')
         car_client = g_car_clients.get(car_id)
         if car_client is None:
@@ -272,7 +272,7 @@ def main_page(request):
             try:
                 car_client.ws.send(bytes_data=request.body)  # 将http请求指令经ws转发到车端
             except Exception as e:
-                debug_print("ws req_task err: ", e)
+                debug_print("ws req_start_task err: ", e)
                 response['code'] = 1  # 当前车辆不在线
                 response['msg'] = "Car communication error"
             else:
@@ -282,9 +282,8 @@ def main_page(request):
                     response['code'] = 1
                     response['msg'] = "Request timeout in server"
             request_task.cv.release()
-
     elif req_type == "req_stop_task":
-        response['type'] = 'res_stop_task'
+        response['type'] = req_type.replace("req", "res")
         car_id = data.get('car_id')
         ok, result = transmitFromHttpToWebsocket(g_car_clients, car_id, request.body)
         if not ok:
@@ -298,7 +297,7 @@ def main_page(request):
 
     if response_text is None:
         response_text = json.dumps(response)
-    debug_print(response_text)
+    debug_print("http_response:", response_text)
     return HttpResponse(response_text)
 
 
