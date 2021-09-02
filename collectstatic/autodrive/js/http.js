@@ -5,14 +5,15 @@ function HttpRequest2(obj) {
         // csrf防御请求头
         'X-CSRFToken': tools.getCookie('csrftoken'),
     };
-
+    console.log(typeof(obj.async)=="undefined");
+    console.log(obj.async || true);
     return $.ajax({
         url: obj.url || "",
         type: obj.type || 'POST',
         headers: headers,
-        async: obj.async || true,
+        async: typeof(obj.async)=="undefined" ? true : obj.async,
+        timeout: typeof(obj.timeout)=="undefined" ? 0 : obj.timeout,
         dataType: obj.dataType || '',
-        timeout:90000,
         data: JSON.stringify(obj.cmd),
 
         success: function(data, status, xhr){
@@ -25,6 +26,8 @@ function HttpRequest2(obj) {
                 obj.done(data);
             }
         },
+        // 请求成功失败都会执行complete
+        complete: obj.complete || function(xhr, status){},
     })
 };
 
@@ -66,37 +69,56 @@ function HttpRequest(obj){
             tools.receive_log("http: " + xhr.responseText);
             obj.done(xhr.responseText);
         }
-
     }
 }
 
 //请求获取在线车辆列表
 function requestOnlineCars(group){
-    request = getXMLHttpRequest();
-    if (request == null)
-        return;
-    cmd = {"type":"req_online_car", "data": {"group": group}};
-
-    request.open("POST", "", true);
-    request.send(JSON.stringify(cmd));
-
-    request.onreadystatechange=function(){
-        if(request.readyState!=4)
-            return;
-        dict = JSON.parse(request.responseText);
-        console.log(dict);
-        type = dict.type;
-        code = dict.code;
-        msg = "";
-        if(code === 0)
-            showOnlineCars(dict.data.cars)
-        else if(code === 7)
-            msg = "无请求权限";
-        else if(code === 2)
-            msg = "无在线车辆";
-
-    }
+    HttpRequest2({
+        cmd: {"type":"req_online_car", "data": {"group": group|""}},
+        url: "",
+        done: function(data){
+            dict = JSON.parse(data);
+            type = dict.type;
+            code = dict.code;
+            msg = "";
+            if(code === 0)
+                showOnlineCars(dict.data.cars)
+            else if(code === 7)
+                msg = "无请求权限";
+            else if(code === 2)
+                msg = "无在线车辆";
+        }
+    });
 }
+
+//请求获取车辆位置, 并按需绘制
+function requestCarsPosition(){
+    cars_id = []
+
+    // 提取被勾选的车辆
+    $(".showCarPos").each(function () {
+        if($(this).prop("checked")){
+            cars_id.push($(this).attr("name"));
+        }
+    });
+//    console.log(cars_id)
+
+    HttpRequest2({
+        cmd: {"type":"req_cars_pos", "data": {"cars_id": cars_id}},
+        url: "",
+        done: function(data){
+            dict = JSON.parse(data);
+            type = dict.type;
+            code = dict.code;
+            msg = "";
+            if(code === 0){
+                window.mapctrler.addCarsMarker(dict.data.cars_pos);
+            }
+        }
+    });
+}
+
 
 //请求监听车辆信息
 function requestListenCars(car_id){
@@ -110,7 +132,7 @@ function requestListenCars(car_id){
 }
 
 function requestPathList(group){
-    tools.send_log(group);
+//    tools.send_log(group);
     HttpRequest2({
         cmd: {"type":"req_path_list", "data": {"group": group}},
         url: "",
@@ -130,12 +152,20 @@ function requestPathList(group){
     });
 }
 
+//请求获取路径轨迹
 function requestPathTraj(pathid){
     HttpRequest({
-        cmd: {"type":"req_path_traj", "data": {"pathid": pathid}},
+        cmd: {"type":"req_path_traj", "data": {"path_id": pathid}},
         url: "",
         done: function(data){
             dict = JSON.parse(data);
-        }
+            type = dict.type;
+            code = dict.code;
+            msg = "";
+            if(code === 0){
+                window.mapctrler.addPathLine(dict.data.points);
+                window.mapctrler.setZoom(dict.data.points);
+            }
+        },
     });
 }

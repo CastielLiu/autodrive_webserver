@@ -6,11 +6,16 @@ import string
 
 
 # 自定义调试打印函数  def print(self, *args, sep=' ', end='\n', file=None)
-def debug_print(self, *args, sep=' ', end='\n', file=None) -> object:
+def debug_print(self, *args, sep=' ', end='\n', file=None):
+    print(self, args, sep=sep, end=end, file=file)
+    return
     if settings.DEBUG:
         print(self, args, sep=sep, end=end, file=file)
 
 
+# 对字典浮点数据进行精度处理
+# @param obj 字典对象
+# @param cnt 保留小数点位数
 def pretty_floats(obj, cnt):
     if isinstance(obj, float):
         return round(obj, cnt)
@@ -67,7 +72,7 @@ def userLoginCheck(database, user_id, user_name, password, token="", session_key
     # print("%s_%s_%s" % (user_id, user_name, password))
     try:
         # 使用Q对象筛选用户, 查找username或userid匹配的用户
-        db_user = database.objects.get(Q(username=user_name) | Q(userid=user_id) & Q(is_active=True))
+        db_user = database.objects.get((Q(username=user_name) | Q(userid=user_id)) & Q(is_active=True))
     except Exception as e:
         print(e)
         result['info'] = "No user!"

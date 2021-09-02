@@ -35,6 +35,7 @@ class CarUser(User):
     longitude = models.FloatField('经度', default=0.0)
     latitude = models.FloatField('纬度', default=0.0)
     soc = models.IntegerField('剩余电量', default=-1)
+    system_state = models.CharField('系统状态', max_length=30, default="unknown")
 
 
 class WebUser(User):

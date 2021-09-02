@@ -1,11 +1,14 @@
 // 匿名函数利用括号包括,将自动自动执行
 (function(){
+    //所有JS全局对象,函数以及变量均自动成为window对象的成员
+    //为避免全局变量冲突, 将当前js文件中的功能封装到匿名函数
+    //为便于外部进行访问, 手动将index设置为window的成员
     var index = window.index = {
         test_key1: null,
         test_key2: null,
         core_ws: null,
         core_ws_login: 0,
-        test_str: "sdsfs",
+        update_cars_clock: null,
 
         init: function(){
             // 保存当前对象指针, 便于子函数访问父对象
@@ -13,6 +16,7 @@
 
             // requestOnlineCars("测试组"); //http
             this.initEvent(); //初始化事件过滤器
+            requestOnlineCars("");
         },
 
         initEvent: function(){
@@ -47,8 +51,6 @@
                     _this.connect_core_ws();
             });
 
-
-
             $(document).on('click', '#wsTestBtn', function(e){
                 ws = new WebSocket('ws://' + window.location.host + '/ws/autodrive/test/');
                 ws.onopen = function(){
@@ -76,7 +78,13 @@
                 $(".showCarPos").each(function () {
                     $(this).prop("checked", flag);
                 });
+
+                window.clearInterval(_this.update_cars_clock);
+                if($(".showCarPos:checked").length > 0){
+                    _this.update_cars_clock = setInterval(requestCarsPosition, 1000);
+                }
             });
+            // 显示某车辆位置
             $(document).on('click', '.showCarPos', function(){
                 var flag = $(this).prop("checked");
                 if (!flag) {
@@ -86,9 +94,103 @@
                         $("#showAllCarsPos").prop("checked", flag);
                     }
                 }
+                window.clearInterval(_this.update_cars_clock);
+                if($(".showCarPos:checked").length > 0){
+                    _this.update_cars_clock = setInterval(requestCarsPosition, 1000);
+                }
+                console.log($(this).name);
+            });
+            //车辆ID点击事件
+            $(document).on('click', '.doTask', function(){
+//                console.log($(this).html());
+                $('#task-msgBox').css('display', 'block');
+                $('#taskCarId').val($(this).html());
+                $("#msgBoxInfomation").html("");
+                requestPathList($('#active_usergroup').html()); //请求路径列表
+            });
+            //关闭消息对话框
+            $(document).on('click', '#closeMsgBox', function(){
+                $('#task-msgBox').css('display', 'none');
+            });
+            //终止车辆当前任务
+            $(document).on('click', '#stopCurrentTask', function(){
+                //stopCurrentTask()
+            });
+            //启动新任务
+            $(document).on('click', '#startNewTask', function(){
+                var object = $(this);
+                object.siblings().hide();
+                object.attr('disabled',true);
+                var msgTextObj = $("#msgBoxInfomation");
+                msgTextObj.html("正在启动新任务，请稍等...");
+                var carid = $('#taskCarId').val();
+                var targetPathid = $("#pathList option:selected").val();
+                var targetSpeed = $("#taskTargetSpeedList option:selected").val();
+                HttpRequest2({
+                    cmd: {"type":"req_start_task", "data": {"car_id": carid, "path_id": targetPathid, "speed": targetSpeed}},
+                    url: "",
+                    timeout: 10000, //10s
+                    async: true,  //async 为false时表示同步, 将导致html页面不更新
+                    done: function(data){
+                        console.log(data);
+                        dict = JSON.parse(data);
+                        type = dict.type;
+                        code = dict.code;
+                        msg = dict.msg;
+                        console.log(data);
+                        if(code === 0){
+                            msgTextObj.html("任务启动成功！");//;
+                        }
+                        else{
+                            msgTextObj.html("任务启动失败: "+msg);//;
+                        }
+                    },
+                    complete: function(xhr, status){
+                        object.attr('disabled', false);
+                        object.siblings().show();
+                        if(status == 'timeout')
+                            msgTextObj.html("请求超时");
+                    },
+                });
+            });
+            //终止当前任务
+            $(document).on('click', '#stopCurrentTask', function(){
+                var _this = this;
+                var object = $(this);
+                var msgTextObj = $("#msgBoxInfomation");
+
+                object.siblings().hide(); object.attr('disabled',true);
+
+                $("#msgBoxInfomation").html("正在请求终止正在执行的任务，请稍等...");
+                var carid = $('#taskCarId').val();
+                HttpRequest2({
+                    cmd: {"type":"req_stop_task", "data": {"car_id": carid}},
+                    url: "",
+                    timeout: 10000, //10s
+                    async: true,  //async 为false时表示同步, 将导致html页面不更新
+                    done: function(data){
+                        dict = JSON.parse(data);
+                        code = dict.code;
+                        msg = dict.msg;
+                        if(code === 0){
+                            msgTextObj.html("当前任务已终止！");//;
+                        }
+                        else{
+                            msgTextObj.html("当前任务终止失败: "+msg);//;
+                        }
+                    },
+                    complete: function(xhr, status){
+                        object.attr('disabled', false);
+                        object.siblings().show();
+                        if(status == 'timeout')
+                            msgTextObj.html("请求超时");
+
+                    },
+                });
             });
         },
 
+        //websocket连接
         connect_core_ws: function(){
             var relogin = true; //允许重新登录
             var _this = this;
@@ -109,7 +211,7 @@
                 }
                 data = JSON.stringify({"type": "req_login", "data": {"userid": userid, "token": token}});
                 tools.send_log(data);
-                _this.core_ws.send(data)
+                _this.core_ws.send(data);
             };
 
             this.core_ws.onmessage = function(evt){
@@ -172,6 +274,12 @@
 
 
 function showOnlineCars(cars){
+
+    // 在线靠前排序
+    cars.sort(function(a,b){
+        return b.online - a.online;
+    });
+
     console.log(cars);
     var tab="<table border='1'>";
     tab+="<tr><th>车辆ID</th><th>车辆名称</th><th>" +"<input type='checkbox' " + "id='showAllCarsPos'>显示位置"+"</th>"
@@ -179,13 +287,22 @@ function showOnlineCars(cars){
         +"</tr>";
 
     for(var i in cars){
-        tab += "<tr><td>" + cars[i].id + "</td><td>" + cars[i].name + "</td><td>"
-            +"<input type='checkbox' " +"class='showCarPos' name='" + cars[i].id + "'/>显示位置"+"</td>"
-            +"<td>" + (cars[i].online?"在线":"离线") + "</td><td>" +cars[i].group + "</td>"
-            +"</tr>"
+        tab += "<tr>";
+            tab += "<td><u class='doTask'>" + cars[i].id + "</u></td>";
+            tab += "<td>" + cars[i].name + "</td>";
+
+            if(cars[i].online){
+                tab += "<td><input type='checkbox' " +"class='showCarPos' name='" + cars[i].id + "'/>显示位置"+"</td>";
+                tab += "<td>在线</td>";
+            }else{
+                tab += "<td><input type='checkbox' disabled='disabled' class='no-showCarPos' name='" + cars[i].id + "'/>显示位置"+"</td>";
+                tab += "<td>离线</td>";
+            }
+
+            tab += "<td>" + cars[i].group + "</td>"
+        tab += "</tr>"
     }
     tab+="</table>";
-    console.log(tab);
 
     var divv=document.getElementById("cars_list");
     divv.innerHTML=tab;

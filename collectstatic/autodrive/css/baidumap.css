@@ -1,13 +1,118 @@
-#baidumap {
-    height: 100%;
-    width: 100%;
-    overflow: hidden;
-}
 
 #r-result {
     width: 100%;
     font-size: 14px;
     position: absolute;
     top: 10px;
-    left: 200px
+    left: 200px;
+}
+
+
+
+.info_ul {
+    margin: 0 0 5px 0;
+    padding: 0.2em 0;
+}
+
+.info_ui_img {
+    background-image: url("/static/autodrive/imgs/error.png");
+    background-position: 97% 0%;
+    background-repeat: no-repeat;
+    background-size: 50px;
+}
+
+.info_ui_Nimg {
+    background-image: url("/static/autodrive/imgs/carNormal.png");
+    background-position: 97% 0%;
+    background-repeat: no-repeat;
+    background-size: 40px;
+}
+
+.info_li {
+    line-height: 26px;
+    font-size: 15px;
+    color: #0C8816;
+}
+
+.info_lierr {
+    line-height: 26px;
+    font-size: 15px;
+    color: #D81E06;
+    border: none;
+}
+
+.info_span {
+    width: 80px;
+    display: inline-block;
+}
+
+.btn {
+    width: 80px;
+    text-align: center;
+    height: 30px;
+    line-height: 30px;
+    border-radius: 5px;
+    cursor: pointer;
+    background-color: #D81E06;
+    color: #fff;
+    margin: 0 auto;
+}
+
+.ta-c {
+    text-align: center;
+    margin-top: 10px;
+}
+
+
+
+/*地图标题*/
+.BMap_bubble_title {
+	color:white;
+	font-size:14px;
+	font-weight:bold;
+	text-align:left;
+	padding-left:5px;
+	padding-top:5px;
+	border-bottom:1px solid gray;
+	background-color:#0066b3;
+}
+/* 消息内容 */
+.BMap_bubble_content {
+	background-color:white;
+	padding-left:5px;
+	padding-top:5px;
+	padding-bottom:10px;
+}
+/* 内容 */
+.BMap_pop div:nth-child(9) {
+	top:35px !important;
+	border-radius:7px;
+}
+/* 左上角删除按键 */
+.BMap_pop img {
+	top:43px !important;
+	left:215px !important;
+}
+.BMap_top {
+	display:none;
+}
+.BMap_bottom {
+	display:none;
+}
+.BMap_center {
+	display:none;
+}
+
+/* 隐藏边角 */
+.BMap_pop div:nth-child(1) div {
+	display:none;
+}
+.BMap_pop div:nth-child(3) {
+	display:none;
+}
+.BMap_pop div:nth-child(5) {
+	display:none;
+}
+.BMap_pop div:nth-child(7) {
+	display:none;
 }

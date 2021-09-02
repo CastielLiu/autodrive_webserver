@@ -3,19 +3,23 @@ import json
 import threading
 
 from .client import Client
+from ..datatypes import ChangeDataMonitor
 
 
-# 车辆状态
-class CarState:
+class CarState: # 车辆状态
     def __init__(self):
         self.speed = None
         self.steer_angle = None
         self.gear = None
-        self.mode = None
         self.longitude = None
         self.latitude = None
         self.x = None
         self.y = None
+        self.status = ChangeDataMonitor()
+        self.mode = ChangeDataMonitor()
+
+    def changed(self):
+        return self.status.changed() or self.mode.changed()
 
     # 获取车辆状态数据字典
     def data(self):

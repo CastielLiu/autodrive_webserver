@@ -114,7 +114,7 @@
                 this.map.addOverlay(marker);
                 this.map.centerAndZoom(point, 17);
 
-//                this.showInfo(marker, cars_pos[i]);
+                console.log(cars_pos[i])
 
                 var sContent = "车辆ID:" + cars_pos[i].car_id + "<br>速度: 0.0km/h";
                 var opts = {

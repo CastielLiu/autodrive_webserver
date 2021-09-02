@@ -42,6 +42,7 @@ class ClientConsumer(WebsocketConsumer):
     # @param client_type: 客户类型
     # @return res: 登录成功
     def login(self, database, data_dict, clients, client_type):
+
         responce = {"type": "res_login", "code": 0, "msg": "", "data": {}}
         if self.login_ok:  # 重复登录
             responce["code"] = 0
@@ -54,6 +55,7 @@ class ClientConsumer(WebsocketConsumer):
             token = data_dict.get("token", "")
 
             login_res = userLoginCheck(database, user_id, user_name, password, token)
+            print("ws_login_res", login_res)
             if login_res['ok']:
                 responce["code"] = 0
                 responce["msg"] = login_res['info']
@@ -81,6 +83,8 @@ class ClientConsumer(WebsocketConsumer):
         on_login = getattr(self, "on_login", None)
         if on_login:
             on_login()
+
+        print("login: ", self.login_ok, data_dict)
         return True
 
     # 注销用户
@@ -106,6 +110,7 @@ class ClientConsumer(WebsocketConsumer):
     # @return msg_type: 需要继续处理的消息类型
     # @return dict类型msg数据
     def preprocesse(self, text_data, database, clients, client_type):
+        debug_print("ws preprocesse: %s" % text_data)
         # 防止未登录客户大数据注入, 后续考虑添加高频非法访问屏蔽, 避免普通攻击
         if not self.login_ok and len(text_data) > 200:
             print("伪数据注入, 访问者未登录且传输大量数据")
@@ -141,6 +146,12 @@ class ClientConsumer(WebsocketConsumer):
 
         return None, None  # 数据无需继续处理
 
+    def on_received(self, text_data):
+        # debug_print("consumer线程id: %d, 总线程数: %d" % (threading.currentThread().ident, len(threading.enumerate())))
+        # self.send("server received %s" % text_data)
+        # debug_print("ws_receive: ", text_data)
+        pass
+
 
 # 车端客户端数据消费者
 class CarClientsConsumer(ClientConsumer):
@@ -156,7 +167,8 @@ class CarClientsConsumer(ClientConsumer):
 
     # 重载父类方法
     def receive(self, text_data):
-        debug_print("ws_receive: ", text_data)
+        self.on_received(text_data)
+
         msg_type, msg = self.preprocesse(text_data, CarUser, g_car_clients, CarClient)
         if msg_type is None:
             return
@@ -164,18 +176,25 @@ class CarClientsConsumer(ClientConsumer):
             client = g_car_clients[self.user_id]
             client.state.speed = msg.get("speed", None)
             client.state.steer_angle = msg.get("steer_angle", None)
-            client.state.mode = msg.get("mode", None)
             client.state.longitude = msg.get("lng", None)
             client.state.latitude = msg.get("lat", None)
 
+            client.state.mode.set(msg.get("mode", None))
+            client.state.status.set(msg.get("status", 'unknown'))
+            if client.state.changed():
+                print("client.state.changed()")
+
             # 控制数据写数据库的频率
             now = time.time()
-            if not hasattr(self, "last_data_save_time") or now - self.last_data_save_time > 1.0:
+            if not hasattr(self, "last_data_save_time") \
+                    or now - self.last_data_save_time > 1.0 \
+                    or client.state.changed():
                 try:
                     # 将部分数据存到数据库
                     car_user = CarUser.objects.get(userid=client.id)
                     car_user.longitude = client.state.longitude
                     car_user.latitude = client.state.latitude
+                    car_user.system_state = client.state.status.get()
                     car_user.save()
                     self.last_data_save_time = now
                 except Exception as e:
@@ -188,6 +207,8 @@ class CarClientsConsumer(ClientConsumer):
             self.client.reqest_task.response = text_data
             self.client.reqest_task.cv.notify()
             self.client.reqest_task.cv.release()
+        else:
+            self.send("Unknown request type!")
 
 
     def on_login(self):
@@ -234,10 +255,9 @@ class UserClientConsumer(ClientConsumer):
 
     # 重载父类方法
     def receive(self, text_data):
-        debug_print("consumer线程id: %d, 总线程数: %d" % (threading.currentThread().ident, len(threading.enumerate())))
-        # debug_print("ws_receive: ", text_data)
+        self.on_received(text_data)
 
-        response = {"type": "", "msg": ""}
+        response = {"type": "", "msg": "", "code": 0, "data": {}}
         msg_type, msg = self.preprocesse(text_data, WebUser, g_user_clients, UserClient)
         if msg_type is None:
             return
@@ -248,7 +268,7 @@ class UserClientConsumer(ClientConsumer):
                 cars.append({"id": car_id, "name": car_client.name})
 
             response["type"] = "res_online_car"
-            response["msg"] = {"cars": cars}
+            response["data"] = {"cars": cars}
             # "msg": {"cars": [{"id": x, "name": x}]}
             self.send(json.dumps(response))
 
@@ -265,6 +285,9 @@ class UserClientConsumer(ClientConsumer):
                     if car_id in self.listen_cars:
                         self.listen_cars.pop(car_id)
                 self.listen_cars[car_id] = car_attr
+
+        else:
+            self.send("Unknown request type!")
 
     def on_login(self):
         # 启动数据自动上报线程

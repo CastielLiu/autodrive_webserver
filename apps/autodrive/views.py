@@ -34,7 +34,7 @@ def render_login_page(request, _locals={}, *args):
 def session_err(request):
     # 获取指定用户名以及会话id的用户, 若用户数为0, 则表明会话已经失效
     users = User.objects.filter(Q(session_key=request.session.session_key) &
-                                Q(userid=request.session.get('userid')))
+                                Q(userid=request.session.get('userid')) & Q(is_active=True))
     if users.count() == 0:
         request.session.clear()
         # print(users.count(), request.session.session_key)
@@ -51,6 +51,7 @@ def check_login(f):
     # 名字f.__name__ 注释f.__doc__
     @wraps(f)
     def inner(request, *arg, **kwargs):
+        # 会话已登录且会话状态正确
         if request.session.get('is_login', False) and not session_err(request):
             return f(request, *arg, **kwargs)
         else:
@@ -97,7 +98,7 @@ def login_page(request):
         login_res = userLoginCheck(CarUser, username, username, password, session_key=session_key)
     else:
         return HttpResponse("Error user type")
-
+    print("http_login_res", login_res)
     if login_res['ok']:  # 登录成功 ,标记 is_login
         # print("登录成功", login_res)
         request.session['is_login'] = True
@@ -112,9 +113,8 @@ def login_page(request):
 
         # 原方案在此处向cookie中添加userid和token, 但由于部分请求在上面已经退出, 无法获得新cookie
         # 于是将userid和token的发放写在了main_page, 以使被重定向的客户也能得到信息
-
         return respose
-    else:
+    else:  # 登录验证失败
         if usertype == User.WebType:
             error = login_res['info']
             return render_login_page(request, locals())
@@ -157,7 +157,7 @@ def main_page(request):
         response.set_cookie('userid', userid)
         response.set_cookie('token', token)
         return response
-    debug_print("%s" % str(request.body))
+    debug_print("http_receive: %s" % str(request.body))
 
     reqest_body = json.loads(request.body)
     req_type = reqest_body.get("type", "")
@@ -260,6 +260,8 @@ def main_page(request):
             response['code'] = 1
         response['data'] = {'cars_pos': cars_pos}
     elif req_type == "req_start_task":
+        debug_print("online cars size: %d" % len(g_car_clients))
+        debug_print(g_car_clients)
         response['type'] = 'res_start_task'
         car_id = data.get('car_id')
         car_client = g_car_clients.get(car_id)
