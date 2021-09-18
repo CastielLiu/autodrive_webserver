@@ -34,8 +34,6 @@ urlpatterns = [
 
 
     # 分布式路由
-    path('bookstore/', include('apps.bookstore.urls')),
     path('autodrive/', include('apps.autodrive.urls')),
-    path('helloworld/', include('apps.helloworld.urls')),
 
 ]

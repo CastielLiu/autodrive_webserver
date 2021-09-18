@@ -1,32 +1,32 @@
 # equal to views.py(视图函数) django
 
-import sys
-
 import json
 import threading
 import time
 
 from channels.generic.websocket import WebsocketConsumer
-from django.db.models import Q, F
-
+from django.conf import settings
 from apps.autodrive.ws_client.carclient import CarClient
 from apps.autodrive.ws_client.webclient import UserClient
-
 from .models import CarUser, WebUser
-from .utils import userLoginCheck, userLogout, debug_print
-
+from .redis_pubsub import PubSub
+from .utils import *
 
 g_car_clients = dict()  # user_id:  client_object(用户信息+ws)
 g_user_clients = dict()  # user_id: client_object(用户信息+ws)
+g_pubsub = PubSub()
 
 
 # 客户端消费者基类
 class ClientConsumer(WebsocketConsumer):
-    user_id = None
-    user_name = None
-    token = ""
-    login_ok = False
-    client = None
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user_group = None
+        self.user_id = None
+        self.user_name = None
+        self.token = ""
+        self.login_ok = False
+        self.client = None
 
     # 关闭连接, response: 关闭回应
     def closeConnect(self, response=None):
@@ -70,7 +70,9 @@ class ClientConsumer(WebsocketConsumer):
             self.login_ok = True
             self.user_id = login_res['userid']
             self.user_name = login_res['username']
+            self.user_group = login_res['group']
 
+            # 此处直接在本地列表中进行的查找, 服务器集群时应当广播用户上线信息, 若在其他服务器已登录，强迫下线
             if self.user_id in clients:  # 用户已在列表, 断开历史连接
                 clients[self.user_id].ws.closeConnect('{"type": "rep_force_offline"}')  # 被迫下线
 
@@ -84,7 +86,7 @@ class ClientConsumer(WebsocketConsumer):
         if on_login:
             on_login()
 
-        print("login: ", self.login_ok, data_dict)
+        # print("login: ", self.login_ok, data_dict)
         return True
 
     # 注销用户
@@ -130,8 +132,7 @@ class ClientConsumer(WebsocketConsumer):
         if msg_type is None:  # 无type字段
             self.closeConnect("消息类型错误!")
         elif msg_type == "req_login":  # 登录请求
-            self.login(database, msg_dict, clients, client_type)
-
+            ok = self.login(database, msg_dict, clients, client_type)
         elif msg_type == "req_logout":  # 注销
             self.logout(database, clients)
         else:  # 其他消息类型
@@ -155,6 +156,10 @@ class ClientConsumer(WebsocketConsumer):
 
 # 车端客户端数据消费者
 class CarClientsConsumer(ClientConsumer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.car_state_channel = None
+        self.car_cmd_channel = None
 
     # 重载父类方法 手动接受连接
     def connect(self):
@@ -170,6 +175,7 @@ class CarClientsConsumer(ClientConsumer):
         self.on_received(text_data)
 
         msg_type, msg = self.preprocesse(text_data, CarUser, g_car_clients, CarClient)
+
         if msg_type is None:
             return
         if msg_type == "rep_car_state":
@@ -200,6 +206,9 @@ class CarClientsConsumer(ClientConsumer):
                 except Exception as e:
                     print(e)
                     pass
+                # 广播车辆状态信息
+                g_pubsub.publish(channel=self.car_state_channel, msg=msg)
+
         # 车端回应任务请求
         elif msg_type == "res_start_task" or \
                 msg_type == "res_stop_task":  # 车端回应任务请求
@@ -210,11 +219,22 @@ class CarClientsConsumer(ClientConsumer):
         else:
             self.send("Unknown request type!")
 
-
-    def on_login(self):
+    def redisCarCmdCallback(self, item: dict):
+        data_dict = json.loads(item['data'])
+        sync_channel = data_dict.get('sync')
+        cmd_dict = json.loads(data_dict.get('msg'))
+        # ************************************
+        print("sync_channel:", sync_channel, " cmd_dict:", cmd_dict)
         pass
 
+    def on_login(self):
+        # car用户登录成功后, 添加redis订阅
+        self.car_cmd_channel = carCmdChannel(self.user_group, self.user_id)
+        self.car_state_channel = carStateChannel(self.user_group, self.user_id)
+        g_pubsub.subscribe(**{self.car_cmd_channel: self.redisCarCmdCallback})
+
     def on_logout(self):
+        g_pubsub.unsubscribe(self.car_cmd_channel)
         pass
 
 
@@ -229,13 +249,13 @@ class UserClientConsumer(ClientConsumer):
 
     # 数据报告线程, 将车辆数据按照一定频率转发到web客户端
     def reportThread(self):
-        report = {"type": "rep_car_state", "msg": None}
+        report = {"type": "rep_car_state", "data": {}}
         while self.thread_run_flag:
             try:
                 for car_id, car_attrs in self.listen_cars.items():
                     if car_id not in g_car_clients:
                         continue
-                    report['msg'] = g_car_clients[car_id].reltimedata(car_attrs)
+                    report['data'] = g_car_clients[car_id].reltimedata(car_attrs)
                     self.send(json.dumps(report))
             except Exception as e:
                 print("reportThread error", e)
@@ -257,17 +277,16 @@ class UserClientConsumer(ClientConsumer):
     def receive(self, text_data):
         self.on_received(text_data)
 
-        response = {"type": "", "msg": "", "code": 0, "data": {}}
         msg_type, msg = self.preprocesse(text_data, WebUser, g_user_clients, UserClient)
         if msg_type is None:
             return
+        response = {"type": msg_type.replace("req", "res"), "msg": "", "code": 0, "data": {}}
 
-        if msg_type == "req_online_car":  # 请求获取在线车辆列表
+        if msg_type == "req_car_list":  # 请求获取车辆列表
             cars = []
             for car_id, car_client in g_car_clients.items():
                 cars.append({"id": car_id, "name": car_client.name})
 
-            response["type"] = "res_online_car"
             response["data"] = {"cars": cars}
             # "msg": {"cars": [{"id": x, "name": x}]}
             self.send(json.dumps(response))
@@ -285,14 +304,22 @@ class UserClientConsumer(ClientConsumer):
                     if car_id in self.listen_cars:
                         self.listen_cars.pop(car_id)
                 self.listen_cars[car_id] = car_attr
-
         else:
             self.send("Unknown request type!")
+
+    # 车辆状态信息(组内用户)
+    def redisCarStateCallback(self, item):
+        print("web user sub car state:", item)
+        pass
 
     def on_login(self):
         # 启动数据自动上报线程
         self.report_thread = threading.Thread(target=self.reportThread)
         self.report_thread.start()
 
+        # 订阅组内car用户状态信息
+        g_pubsub.psubscribe(**{carStateChannelPrefix(self.user_group)+'*': self.redisCarStateCallback})
+
     def on_logout(self):
         pass
+

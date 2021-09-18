@@ -2,11 +2,13 @@
 import json
 import threading
 
+from django.conf import settings
+
 from .client import Client
 from ..datatypes import ChangeDataMonitor
 
 
-class CarState: # 车辆状态
+class CarState:  # 车辆状态
     def __init__(self):
         self.speed = None
         self.steer_angle = None

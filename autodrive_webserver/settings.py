@@ -39,9 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'channels',  # for websockets
-    'apps.bookstore',
     'apps.autodrive',
-    'apps.helloworld',
 ]
 
 MIDDLEWARE = [
@@ -85,6 +83,17 @@ ASGI_APPLICATION = 'autodrive_webserver.routing.application'
 #     },
 # }
 
+REDIS = {
+    'HOST': '127.0.0.1',
+    'PORT': 6379,
+    'DB': 3,
+    'PASSWORD': None,
+    'CHANNELS': {
+        "TO_HTTP": 'publish_to_http',
+        "TO_WS": 'publish_to_websocket',
+    }
+}
+
 # Database
 # https://docs.djangoproject.com/en/2.2/ref/settings/#databases
 DATABASES = {
@@ -93,7 +102,7 @@ DATABASES = {
         'NAME': 'driverless',
         'USER': 'castiel',
         'PASSWORD': 'castiel_pw',
-        'HOST': '36.155.113.13',  # 127.0.0.1  36.155.113.13
+        'HOST': '127.0.0.1',  # 127.0.0.1  36.155.113.13
         'PORT': '3306',
         'CHARSET': 'utf8'
     }

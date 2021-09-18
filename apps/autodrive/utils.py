@@ -140,3 +140,21 @@ def transmitFromHttpToWebsocket(clients, car_id, content, sync=True):
     return True, response_text
 
 
+def carCmdChannelPrefix(group: str):
+    return group + "_car_cmd"
+
+
+# 车辆控制指令redis通道
+def carCmdChannel(group: str, car_id: str):
+    return carCmdChannelPrefix(group) + '_' + car_id
+
+
+# 车辆状态信息通道
+def carStateChannelPrefix(group: str):
+    return group + "_car_state"
+
+
+# 车辆状态信息通道
+def carStateChannel(group: str, car_id: str):
+    return carStateChannelPrefix(group) + '_' + car_id
+

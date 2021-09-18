@@ -253,7 +253,7 @@
                   // info.id
                   // info.car_state
                 }
-                else if(type == "res_online_car"){
+                else if(type == "res_car_list"){
     //                console.log(msg.cars)
                     showOnlineCars(msg.cars)
                 }

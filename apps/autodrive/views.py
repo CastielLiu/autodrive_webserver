@@ -7,13 +7,17 @@ from django.views import static
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.staticfiles.views import serve
 
-from apps.autodrive.consumers import g_car_clients, g_user_clients
+from apps.autodrive.consumers import g_car_clients
 import json
+
+from apps.autodrive.redis_pubsub import PubSub
 from apps.autodrive.utils import userLoginCheck, debug_print, userLogout, pretty_floats, queryValuesListByUserId, \
-    transmitFromHttpToWebsocket
+    transmitFromHttpToWebsocket, carCmdChannel
 from apps.autodrive.models import WebUser, CarUser, User, NavPathInfo
 from apps.autodrive.nodes.nav_path import *
 import zipfile
+
+g_pubsub = PubSub()
 
 
 # 返回渲染登录页面
@@ -103,7 +107,12 @@ def login_page(request):
         # print("登录成功", login_res)
         request.session['is_login'] = True
         request.session['usertype'] = usertype
-        request.session.update(login_res)  # 合并字典,取代逐个复制
+        request.session['username'] = login_res['username']
+        request.session['userid'] = login_res['userid']
+        request.session['usertoken'] = login_res['token']
+        request.session['usergroup'] = login_res['group']
+
+        # request.session.update(login_res)  # 合并字典,取代逐个复制
 
         if usertype == User.WebType:
             respose = redirect(request.GET.get('next'))
@@ -147,7 +156,7 @@ def main_page(request):
 
     if request.method == "GET":
         userid = request.session.get("userid")
-        token = request.session.get("token")
+        token = request.session.get("usertoken")
         if userid is None or token is None:  # 会话中缺少关键字段信息
             return render_login_page(request)
 
@@ -164,11 +173,10 @@ def main_page(request):
     data = reqest_body.get("data", {})
 
     # code默认0为成功, 其他根据type进行编码
-    response = {"type": "", "code": 0, "msg": "", "data": {}}
+    response = {"type": req_type.replace("req", "res"), "code": 0, "msg": "", "data": {}}
     response_text = None
 
-    if req_type == "req_online_car":  # 请求获取(组内)在线车辆列表
-        response['type'] = 'res_online_car'
+    if req_type == "req_car_list":  # 请求获取(组内)在线车辆列表
         car_group = data.get('group', '')  # 期望获取的车辆组
 
         # 如果请求组名非字符串或为空串, 默认请求用户组
@@ -198,7 +206,6 @@ def main_page(request):
             response["data"] = {"cars": cars}
         # "data": {"cars": [{"id": x, "name": x}]}
     elif req_type == "req_path_list":  # 请求获取路径列表
-        response['type'] = 'res_path_list'
         path_group = data.get('group', usergroup)  # 期望获取的路径组, 如果没有该参数, 则默认获取当前用户组
         path_list = getAvailbalePaths(path_group)
         if path_list is None:
@@ -207,7 +214,6 @@ def main_page(request):
             response['data'] = {"path_list": path_list}
         response_text = json.dumps(response, ensure_ascii=False)  # ensure_ascii=False 允许中文编码
     elif req_type == "req_path_traj":  # 获取路径轨迹
-        response['type'] = 'res_path_traj'
         pathid = data.get('path_id', -1)
 
         # {'id': xx, 'name': xx, 'points': [{'lng': xx, 'lat': xx},{}]}
@@ -221,8 +227,7 @@ def main_page(request):
         # print(pretty_floats(response, 5))
         response_text = json.dumps(pretty_floats(response, 5), ensure_ascii=False)
     elif req_type == "req_path_files":  # 获取路径文件(返回文件urls)
-        response['type'] = 'res_path_files'
-        pathid = data.get('pathid', -1)
+        pathid = data.get('path_id', -1)
         if pathid == -1:
             response['code'] = 9  # 格式错误
             response['msg'] = "format error"
@@ -241,7 +246,6 @@ def main_page(request):
                     response['code'] = 0
                     response['data'] = {"path_urls": path_urls, "path_name": navpath.name, "path_id": pathid}
     elif req_type == "req_cars_pos":
-        response['type'] = 'res_cars_pos'
         cars_pos = []
         carsid = data.get('cars_id', [])
         for carid in carsid:
@@ -260,32 +264,34 @@ def main_page(request):
             response['code'] = 1
         response['data'] = {'cars_pos': cars_pos}
     elif req_type == "req_start_task":
-        debug_print("online cars size: %d" % len(g_car_clients))
-        debug_print(g_car_clients)
-        response['type'] = 'res_start_task'
         car_id = data.get('car_id')
-        car_client = g_car_clients.get(car_id)
-        if car_client is None:
-            response['code'] = 1  # 当前车辆不在线
-            response['msg'] = "Car offline"
-        else:
-            request_task = car_client.reqest_task
-            request_task.cv.acquire()
-            try:
-                car_client.ws.send(bytes_data=request.body)  # 将http请求指令经ws转发到车端
-            except Exception as e:
-                debug_print("ws req_start_task err: ", e)
-                response['code'] = 1  # 当前车辆不在线
-                response['msg'] = "Car communication error"
-            else:
-                if request_task.cv.wait(10.0):  # 等待10s
-                    response_text = request_task.response
-                else:
-                    response['code'] = 1
-                    response['msg'] = "Request timeout in server"
-            request_task.cv.release()
+
+        channel = carCmdChannel(request.session['usergroup'], car_id)
+        # request.body 类型为bytes 需解码为str
+        res = g_pubsub.publish(channel, request.body.decode(), sync_channel=channel+'res', timeout=10.0)
+        print("req_start_task, response:", res)
+
+        # car_client = g_car_clients.get(car_id)
+        # if car_client is None:
+        #     response['code'] = 1  # 当前车辆不在线
+        #     response['msg'] = "Car offline"
+        # else:
+        #     request_task = car_client.reqest_task
+        #     request_task.cv.acquire()
+        #     try:
+        #         car_client.ws.send(bytes_data=request.body)  # 将http请求指令经ws转发到车端
+        #     except Exception as e:
+        #         debug_print("ws req_start_task err: ", e)
+        #         response['code'] = 1  # 当前车辆不在线
+        #         response['msg'] = "Car communication error"
+        #     else:
+        #         if request_task.cv.wait(10.0):  # 等待10s
+        #             response_text = request_task.response
+        #         else:
+        #             response['code'] = 2
+        #             response['msg'] = "Request timeout in server"
+        #     request_task.cv.release()
     elif req_type == "req_stop_task":
-        response['type'] = req_type.replace("req", "res")
         car_id = data.get('car_id')
         ok, result = transmitFromHttpToWebsocket(g_car_clients, car_id, request.body)
         if not ok:

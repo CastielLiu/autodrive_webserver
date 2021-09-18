@@ -75,7 +75,7 @@ function HttpRequest(obj){
 //请求获取在线车辆列表
 function requestOnlineCars(group){
     HttpRequest2({
-        cmd: {"type":"req_online_car", "data": {"group": group|""}},
+        cmd: {"type":"req_car_list", "data": {"group": group|""}},
         url: "",
         done: function(data){
             dict = JSON.parse(data);

@@ -24,7 +24,11 @@
     <autoscroll-to-editor value="false" />
     <autoscroll-from-editor value="true" />
     <show-object-properties value="true" />
-    <loaded-nodes />
+    <loaded-nodes>
+      <connection connection-id="743daeb6-e6ce-4d6f-af70-f2a76f2b8fa5">
+        <schema name="driverless" object-types="table, view, procedure, function, index, column" />
+      </connection>
+    </loaded-nodes>
   </component>
   <component name="DBNavigator.Project.DatabaseConsoleManager">
     <connection id="743daeb6-e6ce-4d6f-af70-f2a76f2b8fa5">
@@ -43,11 +47,17 @@
         <condition column="id" operator="=" value="0" active="true" />
       </filter>
     </filter-actions>
+    <filter-actions connection-id="743daeb6-e6ce-4d6f-af70-f2a76f2b8fa5" dataset="driverless.autodrive_webuser" active-filter-id="a7a1252c-9059-4db2-9656-91be3cb3aa3d">
+      <filter id="a7a1252c-9059-4db2-9656-91be3cb3aa3d" name="Filter 1" temporary="false" custom-name="false" type="basic" join-type="AND">
+        <condition column="user_ptr_id" operator="=" value="" active="true" />
+      </filter>
+    </filter-actions>
     <filter-actions connection-id="743daeb6-e6ce-4d6f-af70-f2a76f2b8fa5" dataset="driverless.django_migrations" active-filter-id="EMPTY_FILTER">
       <filter id="1d8c6948-115b-4059-b3c1-03db6e823246" name="27" temporary="false" custom-name="false" type="basic" join-type="AND">
         <condition column="id" operator="=" value="27" active="true" />
       </filter>
     </filter-actions>
+    <filter-actions connection-id="743daeb6-e6ce-4d6f-af70-f2a76f2b8fa5" dataset="driverless.testapp_usergroup" active-filter-id="" />
     <filter-actions connection-id="743daeb6-e6ce-4d6f-af70-f2a76f2b8fa5" dataset="driverless.autodrive_navpathinfo" active-filter-id="EMPTY_FILTER">
       <filter id="4329e433-027b-4d2d-b28b-4bd2c7e0af8d" name="0" temporary="false" custom-name="false" type="basic" join-type="AND">
         <condition column="id" operator="=" value="0" active="true" />
@@ -70,6 +80,11 @@
     </filter-actions>
     <filter-actions connection-id="743daeb6-e6ce-4d6f-af70-f2a76f2b8fa5" dataset="driverless.django_content_type" active-filter-id="EMPTY_FILTER" />
     <filter-actions connection-id="743daeb6-e6ce-4d6f-af70-f2a76f2b8fa5" dataset="driverless.book" active-filter-id="EMPTY_FILTER" />
+    <filter-actions connection-id="743daeb6-e6ce-4d6f-af70-f2a76f2b8fa5" dataset="driverless.autodrive_usergroup" active-filter-id="EMPTY_FILTER">
+      <filter id="41c01d0a-2697-4aab-bff3-6a925a04f960" name="Filter 1" temporary="false" custom-name="false" type="basic" join-type="AND">
+        <condition column="id" operator="=" value="" active="true" />
+      </filter>
+    </filter-actions>
     <filter-actions connection-id="743daeb6-e6ce-4d6f-af70-f2a76f2b8fa5" dataset="driverless.django_admin_log" active-filter-id="" />
   </component>
   <component name="DBNavigator.Project.EditorStateManager">
@@ -94,7 +109,9 @@
     <filters />
   </component>
   <component name="DBNavigator.Project.ScriptExecutionManager" clear-outputs="true">
-    <recently-used-interfaces />
+    <recently-used-interfaces>
+      <mapping database-type="MYSQL" interface-id="DEFAULT" />
+    </recently-used-interfaces>
   </component>
   <component name="DBNavigator.Project.Settings">
     <connections>
@@ -109,7 +126,7 @@
           <driver-library value="" />
           <driver value="" />
           <url-type value="DATABASE" />
-          <host value="36.155.113.13" />
+          <host value="127.0.0.1" />
           <port value="3306" />
           <database value="driverless" />
           <type value="USER_PASSWORD" />
