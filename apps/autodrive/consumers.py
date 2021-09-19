@@ -112,7 +112,7 @@ class ClientConsumer(WebsocketConsumer):
     # @return msg_type: 需要继续处理的消息类型
     # @return dict类型msg数据
     def preprocesse(self, text_data, database, clients, client_type):
-        debug_print("ws preprocesse: %s" % text_data)
+        # debug_print("ws preprocesse: %s" % text_data)
         # 防止未登录客户大数据注入, 后续考虑添加高频非法访问屏蔽, 避免普通攻击
         if not self.login_ok and len(text_data) > 200:
             print("伪数据注入, 访问者未登录且传输大量数据")
@@ -160,6 +160,7 @@ class CarClientsConsumer(ClientConsumer):
         super().__init__(*args, **kwargs)
         self.car_state_channel = None
         self.car_cmd_channel = None
+        self.client = None
 
     # 重载父类方法 手动接受连接
     def connect(self):
@@ -178,60 +179,83 @@ class CarClientsConsumer(ClientConsumer):
 
         if msg_type is None:
             return
-        if msg_type == "rep_car_state":
-            client = g_car_clients[self.user_id]
-            client.state.speed = msg.get("speed", None)
-            client.state.steer_angle = msg.get("steer_angle", None)
-            client.state.longitude = msg.get("lng", None)
-            client.state.latitude = msg.get("lat", None)
+        if msg_type == "rep_car_state":  # 车端向服务器上报状态信息, 服务器向web端转发并定时保存到数据库
+            self.client.state.speed = msg.get("speed", None)
+            self.client.state.steer_angle = msg.get("steer_angle", None)
+            self.client.state.longitude = msg.get("lng", None)
+            self.client.state.latitude = msg.get("lat", None)
 
-            client.state.mode.set(msg.get("mode", None))
-            client.state.status.set(msg.get("status", 'unknown'))
-            if client.state.changed():
-                print("client.state.changed()")
+            self.client.state.mode.set(msg.get("mode", None))
+            self.client.state.status.set(msg.get("status", 'unknown'))
+
+            # 广播车辆状态信息
+            g_pubsub.publish(channel=self.car_state_channel, msg=text_data)
 
             # 控制数据写数据库的频率
             now = time.time()
             if not hasattr(self, "last_data_save_time") \
                     or now - self.last_data_save_time > 1.0 \
-                    or client.state.changed():
+                    or self.client.state.changed():
                 try:
                     # 将部分数据存到数据库
-                    car_user = CarUser.objects.get(userid=client.id)
-                    car_user.longitude = client.state.longitude
-                    car_user.latitude = client.state.latitude
-                    car_user.system_state = client.state.status.get()
+                    car_user = CarUser.objects.get(userid=self.client.id)
+                    car_user.longitude = self.client.state.longitude
+                    car_user.latitude = self.client.state.latitude
+                    car_user.system_state = self.client.state.status.get()
                     car_user.save()
                     self.last_data_save_time = now
                 except Exception as e:
                     print(e)
-                    pass
-                # 广播车辆状态信息
-                g_pubsub.publish(channel=self.car_state_channel, msg=msg)
 
         # 车端回应任务请求
         elif msg_type == "res_start_task" or \
                 msg_type == "res_stop_task":  # 车端回应任务请求
+            print(msg_type, msg_type, msg_type)
             self.client.reqest_task.cv.acquire()
             self.client.reqest_task.response = text_data
             self.client.reqest_task.cv.notify()
             self.client.reqest_task.cv.release()
+        elif msg_type == "rep_taskdone" or \
+                msg_type == "rep_taskfeedback":
+            # 转发到web客户端
+            g_pubsub.publish(channel=self.car_state_channel, msg=msg)
         else:
-            self.send("Unknown request type!")
+            print("Unknown msg type: %s!" % msg_type)
 
+    # 接收经redis转发的车辆控制请求指令
     def redisCarCmdCallback(self, item: dict):
         data_dict = json.loads(item['data'])
-        sync_channel = data_dict.get('sync')
-        cmd_dict = json.loads(data_dict.get('msg'))
-        # ************************************
-        print("sync_channel:", sync_channel, " cmd_dict:", cmd_dict)
-        pass
+        sync_channel = data_dict.get('sync')  # 请求的同步响应通道(指令发送者期望通过该通道获取响应)
+        error_msg = None
+        try:
+            self.send(text_data=data_dict.get('body'))  # 转发cmd到车端
+            send_ok = True
+        except Exception as e:
+            send_ok = False
+            error_msg = "Communation with car error"
+
+        if sync_channel is None:  # 无需同步响应
+            return
+
+        print("redisCarCmdCallback", data_dict)
+        sync_timeout = data_dict.get('timeout', 0)
+        self.client.reqest_task.cv.acquire()
+        gotit = self.client.reqest_task.cv.wait(sync_timeout)
+        if not gotit:
+            error_msg = "Request timeout in driverless server."
+
+        print("self.client.reqest_task.response", self.client.reqest_task.response)
+        g_pubsub.sync_response(sync_channel, self.client.reqest_task.response, error_msg)
+        self.client.reqest_task.response = ""
+        self.client.reqest_task.cv.release()
 
     def on_login(self):
         # car用户登录成功后, 添加redis订阅
         self.car_cmd_channel = carCmdChannel(self.user_group, self.user_id)
         self.car_state_channel = carStateChannel(self.user_group, self.user_id)
-        g_pubsub.subscribe(**{self.car_cmd_channel: self.redisCarCmdCallback})
+        self.client = g_car_clients[self.user_id]
+
+        g_pubsub.subscribe(self.car_cmd_channel, self.redisCarCmdCallback)
 
     def on_logout(self):
         g_pubsub.unsubscribe(self.car_cmd_channel)
@@ -310,15 +334,19 @@ class UserClientConsumer(ClientConsumer):
     # 车辆状态信息(组内用户)
     def redisCarStateCallback(self, item):
         print("web user sub car state:", item)
-        pass
+        data_dict = json.loads(item['data'])
+        try:
+            self.send(text_data=data_dict.get('body'))  # 转发数据转发到web客户端
+        except Exception as e:
+            pass
 
     def on_login(self):
         # 启动数据自动上报线程
         self.report_thread = threading.Thread(target=self.reportThread)
         self.report_thread.start()
 
-        # 订阅组内car用户状态信息
-        g_pubsub.psubscribe(**{carStateChannelPrefix(self.user_group)+'*': self.redisCarStateCallback})
+        # 订阅组内car用户所有状态信息
+        g_pubsub.psubscribe(carStateChannelPrefix(self.user_group)+'*', self.redisCarStateCallback)
 
     def on_logout(self):
         pass

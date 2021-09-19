@@ -7,7 +7,6 @@ from django.views import static
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.staticfiles.views import serve
 
-from apps.autodrive.consumers import g_car_clients
 import json
 
 from apps.autodrive.redis_pubsub import PubSub
@@ -149,7 +148,7 @@ def logout_page(request):
 @check_login
 def main_page(request):
     username = request.session.get("username", "")
-    usergroup = request.session.get("group", "默认组")  # 用户组
+    usergroup = request.session.get("usergroup", "Unknown")  # 用户组
     is_super = request.session.get("is_super", False)  # 超级用户
 
     # print("所属组：", usergroup, "是否为超级用户:", is_super)
@@ -198,10 +197,6 @@ def main_page(request):
                                  "online": db_car.is_online})
             except Exception as e:
                 pass
-
-            # 在线车辆
-            # for car_id, car_client in g_car_clients.items():
-            #     cars.append({"id": car_id, "name": car_client.name})
 
             response["data"] = {"cars": cars}
         # "data": {"cars": [{"id": x, "name": x}]}
@@ -263,42 +258,22 @@ def main_page(request):
         else:
             response['code'] = 1
         response['data'] = {'cars_pos': cars_pos}
-    elif req_type == "req_start_task":
+    elif req_type == "req_start_task" or req_type == "req_stop_task":
         car_id = data.get('car_id')
 
-        channel = carCmdChannel(request.session['usergroup'], car_id)
+        channel = carCmdChannel(usergroup, car_id)
         # request.body 类型为bytes 需解码为str
-        res = g_pubsub.publish(channel, request.body.decode(), sync_channel=channel+'res', timeout=10.0)
-        print("req_start_task, response:", res)
+        redis_response = g_pubsub.sync_request(channel, request.body.decode(), sync_channel=channel+'res', timeout=10.0)
+        redis_response_dict = json.loads(redis_response)
+        ok = redis_response_dict['ok']
+        body = redis_response_dict['body']
 
-        # car_client = g_car_clients.get(car_id)
-        # if car_client is None:
-        #     response['code'] = 1  # 当前车辆不在线
-        #     response['msg'] = "Car offline"
-        # else:
-        #     request_task = car_client.reqest_task
-        #     request_task.cv.acquire()
-        #     try:
-        #         car_client.ws.send(bytes_data=request.body)  # 将http请求指令经ws转发到车端
-        #     except Exception as e:
-        #         debug_print("ws req_start_task err: ", e)
-        #         response['code'] = 1  # 当前车辆不在线
-        #         response['msg'] = "Car communication error"
-        #     else:
-        #         if request_task.cv.wait(10.0):  # 等待10s
-        #             response_text = request_task.response
-        #         else:
-        #             response['code'] = 2
-        #             response['msg'] = "Request timeout in server"
-        #     request_task.cv.release()
-    elif req_type == "req_stop_task":
-        car_id = data.get('car_id')
-        ok, result = transmitFromHttpToWebsocket(g_car_clients, car_id, request.body)
-        if not ok:
+        if not ok:  # sync_request请求失败
             response['code'] = 1
-            response['msg'] = result
+            response['msg'] = redis_response_dict['error_msg']
         else:
-            response_text = result
+            response_text = body
+        print("req_start_task, response:", redis_response)
     else:
         response['code'] = 1
         response['msg'] = "Unknown request."

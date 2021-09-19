@@ -239,7 +239,7 @@
                         return;
                     }else{
                         loginInfo.innerHTML = "帐号或密码/token错误";
-                        location.reload();
+                        location.reload(); //登录帐号以及token均是从cookie获取, 正常不会出错, 如验证失败, 刷新页面以重新获取cookie
                         console.log("帐号或密码/token错误");
                     }
                 }
@@ -252,6 +252,8 @@
                   // 状态数据
                   // info.id
                   // info.car_state
+
+                  $('#taskCarState').val(data.status);
                 }
                 else if(type == "res_car_list"){
     //                console.log(msg.cars)
@@ -265,6 +267,8 @@
                     connectBtn.innerHTML = "连接";
                     _this.core_ws_login = 0;
                 }
+                console.log("core_ws close, try to reconnect");
+                _this.connect_core_ws(); //重新连接, 若不进行重连, 实时信息将无法接收
             };
         },
     };

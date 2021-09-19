@@ -4,14 +4,19 @@ from .customize_fields import RestrictedFileField
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
 
+# 当模型没有指定主键时, 迁移的时候将自动生成id字段, 数据自动生成且不重复
+# id = models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')
+# 主键至关重要且不能由默认值, 因此新建模型时务必明确主键, 如已经创建了数据，再修改主键将十分麻烦(可能需要删除所有数据)
+
 
 class UserGroup(models.Model):
-    name = models.CharField('用户组名称', max_length=20, unique=True, primary_key=True)
+    id = models.CharField('用户组名称ID', max_length=20, unique=True, primary_key=True)
+    name = models.CharField('用户组名称', max_length=20, unique=True)
     supergroup = models.BooleanField('超级用户组', default=False)
 
 
 def default_user_group():
-    return UserGroup.objects.get_or_create(name="empty")[0].name
+    return UserGroup.objects.get_or_create(name="guest")[0].id
 
 
 # Create your models here.
@@ -48,9 +53,10 @@ class NavPathInfo(models.Model):
     # 动态生成文件路径
     # @param instance 当前模型实例
     # @param filename 上传时的文件名
-    def file_path(self, filename):
-        return '%s/%s/%s/%s' % ('autodrive_paths', self.uploader.group.name, self.name, filename)
+    def file_path(self, filename):  # groupid+pathid
+        return '%s/%s/%s/%s' % ('autodrive_paths', 'group_' + str(self.uploader.group.id), 'path_' + str(self.id), filename)
 
+    id = models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')
     # 关联上传者, 删除时不设保护
     uploader = models.ForeignKey(WebUser, models.DO_NOTHING, blank=False, null=True, verbose_name="上传者")
 

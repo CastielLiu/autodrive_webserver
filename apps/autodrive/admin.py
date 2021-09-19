@@ -19,7 +19,7 @@ class UserManager(admin.ModelAdmin):
 
 
 class UserGroupManager(admin.ModelAdmin):
-    list_display = ['name', 'supergroup']
+    list_display = ['id', 'name', 'supergroup']
 
 
 class NavPathInfoManager(admin.ModelAdmin):

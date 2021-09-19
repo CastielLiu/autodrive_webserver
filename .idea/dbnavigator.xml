@@ -26,7 +26,7 @@
     <show-object-properties value="true" />
     <loaded-nodes>
       <connection connection-id="743daeb6-e6ce-4d6f-af70-f2a76f2b8fa5">
-        <schema name="driverless" object-types="table, view, procedure, function, index, column" />
+        <schema name="driverless" object-types="table, view" />
       </connection>
     </loaded-nodes>
   </component>
