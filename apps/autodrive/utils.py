@@ -95,6 +95,8 @@ def userLoginCheck(database, user_id, user_name, password, token="", session_key
     result['userid'] = db_user.userid
     result['token'] = db_user.token
     result['group'] = db_user.group.name
+    result['groupid'] = db_user.group.id
+    result['usertype'] = db_user.type
 
     if db_user.type == db_user.WebType:
         result['is_super'] = db_user.is_super
@@ -140,21 +142,21 @@ def transmitFromHttpToWebsocket(clients, car_id, content, sync=True):
     return True, response_text
 
 
-def carCmdChannelPrefix(group: str):
-    return group + "_car_cmd"
+def carCmdChannelPrefix(groupid: str):
+    return str(groupid) + "_car_cmd"
 
 
 # 车辆控制指令redis通道
-def carCmdChannel(group: str, car_id: str):
-    return carCmdChannelPrefix(group) + '_' + car_id
+def carCmdChannel(groupid: str, car_id: str):
+    return carCmdChannelPrefix(groupid) + '_' + car_id
 
 
 # 车辆状态信息通道
-def carStateChannelPrefix(group: str):
-    return group + "_car_state"
+def carStateChannelPrefix(groupid: str):
+    return str(groupid) + "_car_state"
 
 
 # 车辆状态信息通道
-def carStateChannel(group: str, car_id: str):
-    return carStateChannelPrefix(group) + '_' + car_id
+def carStateChannel(groupid: str, car_id: str):
+    return carStateChannelPrefix(groupid) + '_' + car_id
 

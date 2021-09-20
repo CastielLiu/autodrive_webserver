@@ -35,19 +35,19 @@ def getTestNavPath(group_name, path_id):
 
 
 # 获取组内可用路径(查数据库)
-def getAvailbalePaths(group_name):
-    paths = NavPathInfo.objects.filter(Q(uploader__group__name=group_name) & Q(is_active=True))
+def getAvailbalePaths(group_id):
+    paths = NavPathInfo.objects.filter(Q(uploader__group__id=group_id) & Q(is_active=True))
     path_list = [{'id': path.id, 'name': path.name} for path in paths]
     return path_list
 
 
 # 获取路径轨迹数据(查数据库)
-# @param group_name 获取组内路径
+# @param group_id 获取组内路径
 # @param path_id 路径ID
-def getNavPathTraj(group_name, path_id):
+def getNavPathTraj(group_id, path_id):
     try:
-        debug_print("getNavPathTraj path_id:%d, group_name:%s" % (path_id, group_name))
-        navpaths = NavPathInfo.objects.filter(Q(id=path_id) & Q(uploader__group__name=group_name) & Q(is_active=True))
+        debug_print("getNavPathTraj path_id:%d, group_id:%s" % (path_id, group_id))
+        navpaths = NavPathInfo.objects.filter(Q(id=path_id) & Q(uploader__group__id=group_id) & Q(is_active=True))
         if navpaths.count() == 0:
             return False, "Path not exist", None
         navpath = navpaths[0]

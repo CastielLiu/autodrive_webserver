@@ -110,6 +110,7 @@ def login_page(request):
         request.session['userid'] = login_res['userid']
         request.session['usertoken'] = login_res['token']
         request.session['usergroup'] = login_res['group']
+        request.session['groupid'] = login_res['groupid']
 
         # request.session.update(login_res)  # 合并字典,取代逐个复制
 
@@ -137,7 +138,7 @@ def logout_page(request):
     # 从会话中清除登录状态
     # request.session['is_login'] = False
 
-    debug_print(request.session.get('username'), "logout")
+    # debug_print(request.session.get('username'), "logout")
     userLogout(WebUser, request.session.get('username'))
     request.session.clear()  # 清空会话数据
 
@@ -149,6 +150,7 @@ def logout_page(request):
 def main_page(request):
     username = request.session.get("username", "")
     usergroup = request.session.get("usergroup", "Unknown")  # 用户组
+    usergroupid = request.session.get('groupid')  # 用户组id
     is_super = request.session.get("is_super", False)  # 超级用户
 
     # print("所属组：", usergroup, "是否为超级用户:", is_super)
@@ -164,6 +166,7 @@ def main_page(request):
         # 最初方案为保存userame但测试表明cookie设置中文出现问题, 从而修改为保存id
         response.set_cookie('userid', userid)
         response.set_cookie('token', token)
+        response.set_cookie('groupid', usergroupid)
         return response
     debug_print("http_receive: %s" % str(request.body))
 
@@ -176,13 +179,13 @@ def main_page(request):
     response_text = None
 
     if req_type == "req_car_list":  # 请求获取(组内)在线车辆列表
-        car_group = data.get('group', '')  # 期望获取的车辆组
+        car_groupid = data.get('groupid', '')  # 期望获取的车辆组id
 
         # 如果请求组名非字符串或为空串, 默认请求用户组
-        if not isinstance(car_group, str) or car_group == "":
-            car_group = usergroup
+        if not isinstance(car_groupid, str) or car_groupid == "":
+            car_groupid = usergroupid
 
-        if usergroup != car_group and not is_super:  # 非超级用户且非组内用户
+        if usergroupid != car_groupid and not is_super:  # 非超级用户且非组内用户
             response['code'] = 7  # 非组内用户(无权限)
         else:
             cars = []
@@ -190,7 +193,7 @@ def main_page(request):
                 if is_super:
                     db_cars = CarUser.objects.filter(is_active=True)  # 超级权限, 显示所有用户
                 else:
-                    db_cars = CarUser.objects.filter(group=car_group, is_active=True)
+                    db_cars = CarUser.objects.filter(group=car_groupid, is_active=True)
                 for db_car in db_cars:
                     # print("%s, %s, %s" % (db_car.group.supergroup, db_car.group.name, group))
                     cars.append({"id": db_car.userid, "name": db_car.username, "group": db_car.group.name,
@@ -201,8 +204,8 @@ def main_page(request):
             response["data"] = {"cars": cars}
         # "data": {"cars": [{"id": x, "name": x}]}
     elif req_type == "req_path_list":  # 请求获取路径列表
-        path_group = data.get('group', usergroup)  # 期望获取的路径组, 如果没有该参数, 则默认获取当前用户组
-        path_list = getAvailbalePaths(path_group)
+        path_groupid = data.get('groupid', usergroupid)  # 期望获取的路径组, 如果没有该参数, 则默认获取当前用户组
+        path_list = getAvailbalePaths(path_groupid)
         if path_list is None:
             response['code'] = 1
         else:
@@ -212,7 +215,7 @@ def main_page(request):
         pathid = data.get('path_id', -1)
 
         # {'id': xx, 'name': xx, 'points': [{'lng': xx, 'lat': xx},{}]}
-        ok, msg, path = getNavPathTraj(usergroup, pathid)
+        ok, msg, path = getNavPathTraj(usergroupid, pathid)
         if not ok:
             response['code'] = 1
             response['msg'] = msg
@@ -227,7 +230,7 @@ def main_page(request):
             response['code'] = 9  # 格式错误
             response['msg'] = "format error"
         else:
-            navpaths = NavPathInfo.objects.filter(Q(id=pathid) & Q(uploader__group__name=usergroup))
+            navpaths = NavPathInfo.objects.filter(Q(id=pathid) & Q(uploader__group__id=usergroupid))
             if navpaths.count() != 1:
                 response['code'] = 1
                 response['msg'] = "No path"
@@ -261,7 +264,7 @@ def main_page(request):
     elif req_type == "req_start_task" or req_type == "req_stop_task":
         car_id = data.get('car_id')
 
-        channel = carCmdChannel(usergroup, car_id)
+        channel = carCmdChannel(usergroupid, car_id)
         # request.body 类型为bytes 需解码为str
         redis_response = g_pubsub.sync_request(channel, request.body.decode(), sync_channel=channel+'res', timeout=10.0)
         redis_response_dict = json.loads(redis_response)

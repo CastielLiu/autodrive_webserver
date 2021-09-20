@@ -10,6 +10,10 @@
         core_ws_login: 0,
         update_cars_clock: null,
 
+        user_groupname: $('#active_usergroup').html(),
+        user_groupid: tools.getCookie('groupid'),
+        user_id: tools.getCookie('userid'),
+
         init: function(){
             // 保存当前对象指针, 便于子函数访问父对象
             var _this = this;
@@ -36,7 +40,7 @@
 
             // .class  #id
             $(document).on('click', '#getPathListBtn', function(e){
-               requestPathList($('#active_usergroup').html());
+               requestPathList(_this.user_groupid);
             });
 
             $(document).on('click', '#getPathBtn', function(e){
@@ -49,6 +53,10 @@
                     _this.core_ws.close();
                 else
                     _this.connect_core_ws();
+            });
+
+            $(document).on('click', '#logoutBtn', function(e){
+               _this.ws_logout();
             });
 
             $(document).on('click', '#wsTestBtn', function(e){
@@ -106,7 +114,7 @@
                 $('#task-msgBox').css('display', 'block');
                 $('#taskCarId').val($(this).html());
                 $("#msgBoxInfomation").html("");
-                requestPathList($('#active_usergroup').html()); //请求路径列表
+                requestPathList(_this.user_groupid); //请求路径列表
             });
             //关闭消息对话框
             $(document).on('click', '#closeMsgBox', function(){
@@ -190,6 +198,11 @@
             });
         },
 
+        ws_logout: function(){
+            this.core_ws.send(JSON.stringify({"type": "req_logout", "data": {}}));
+
+        },
+
         //websocket连接
         connect_core_ws: function(){
             var relogin = true; //允许重新登录
@@ -253,7 +266,7 @@
                   // info.id
                   // info.car_state
 
-                  $('#taskCarState').val(data.status);
+                  $('#taskCarState').val(data.status);  //自动驾驶任务状态
                 }
                 else if(type == "res_car_list"){
     //                console.log(msg.cars)

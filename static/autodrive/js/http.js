@@ -134,7 +134,7 @@ function requestListenCars(car_id){
 function requestPathList(group){
 //    tools.send_log(group);
     HttpRequest2({
-        cmd: {"type":"req_path_list", "data": {"group": group}},
+        cmd: {"type":"req_path_list", "data": {"groupid": window.index.user_groupid}},
         url: "",
         done: function(data){
             dict = JSON.parse(data);

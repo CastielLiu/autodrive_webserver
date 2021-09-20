@@ -102,7 +102,7 @@ DATABASES = {
         'NAME': 'driverless',
         'USER': 'castiel',
         'PASSWORD': 'castiel_pw',
-        'HOST': '127.0.0.1',  # 127.0.0.1  36.155.113.13
+        'HOST': '36.155.113.13',  # 127.0.0.1  36.155.113.13
         'PORT': '3306',
         'CHARSET': 'utf8'
     }

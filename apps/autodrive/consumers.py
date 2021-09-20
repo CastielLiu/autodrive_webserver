@@ -19,14 +19,30 @@ g_pubsub = PubSub()
 
 # 客户端消费者基类
 class ClientConsumer(WebsocketConsumer):
+    CAR_CLIENT_TYPE = 0
+    WEB_CLIENT_TYPE = 1
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.user_group = None
+        self.user_groupname = None
+        self.user_groupid = None
         self.user_id = None
         self.user_name = None
         self.token = ""
         self.login_ok = False
-        self.client = None
+        self.client = None  # 客户端数据
+        self.client_type = None
+        self.db = None  # 数据库
+
+    def safetySend(self, text_data=None, bytes_data=None, close=False):
+        try:
+            self.send(text_data, bytes_data, close)
+        except Exception as e:
+            if not self.login_ok:
+                return
+
+            if self.login_ok:  # 发送失败且已登录, 则自动退出登录
+                self.logout()
 
     # 关闭连接, response: 关闭回应
     def closeConnect(self, response=None):
@@ -36,13 +52,11 @@ class ClientConsumer(WebsocketConsumer):
         self.close()
 
     # 用户登录, 登录成功后将其加入用户列表
-    # @param database: 用户信息数据库
     # @param data_dict: 用户请求登录数据
     # @param clients:   已登录客户端
     # @param client_type: 客户类型
     # @return res: 登录成功
-    def login(self, database, data_dict, clients, client_type):
-
+    def login(self, data_dict, clients, client_type):
         responce = {"type": "res_login", "code": 0, "msg": "", "data": {}}
         if self.login_ok:  # 重复登录
             responce["code"] = 0
@@ -54,7 +68,7 @@ class ClientConsumer(WebsocketConsumer):
             password = data_dict.get("password", "")
             token = data_dict.get("token", "")
 
-            login_res = userLoginCheck(database, user_id, user_name, password, token)
+            login_res = userLoginCheck(self.db, user_id, user_name, password, token)
             print("ws_login_res", login_res)
             if login_res['ok']:
                 responce["code"] = 0
@@ -68,9 +82,10 @@ class ClientConsumer(WebsocketConsumer):
                 return False
 
             self.login_ok = True
-            self.user_id = login_res['userid']
+            self.user_id = str(login_res['userid'])
             self.user_name = login_res['username']
-            self.user_group = login_res['group']
+            self.user_groupname = login_res['group']
+            self.user_groupid = str(login_res['groupid'])
 
             # 此处直接在本地列表中进行的查找, 服务器集群时应当广播用户上线信息, 若在其他服务器已登录，强迫下线
             if self.user_id in clients:  # 用户已在列表, 断开历史连接
@@ -91,13 +106,12 @@ class ClientConsumer(WebsocketConsumer):
 
     # 注销用户
     # clients 已登录用户列表
-    def logout(self, database, clients):
+    def logout(self, clients):
         if self.login_ok and self.user_id in clients:
             client = clients.pop(self.user_id)
             print("user: %s logout, remaind %d %s users" % (self.user_id, len(clients), client.type))
-        userLogout(database, self.user_name, update_db=True)  # 在数据库中标注离线
+        userLogout(self.db, self.user_name, update_db=True)  # 在数据库中标注离线
         self.login_ok = False
-        self.user_id = -1
         self.closeConnect()
         # 调用子类注销成功‘回调函数’(如果有)
         on_logout = getattr(self, "on_logout", None)
@@ -106,12 +120,11 @@ class ClientConsumer(WebsocketConsumer):
 
     # 客户端消息预处理, 格式错误处理, 登录注销
     # @param text_data客户端消息
-    # @param database: 用户信息数据库
     # @param clients:   已登录客户端
     # @param client_type: 客户类型
     # @return msg_type: 需要继续处理的消息类型
     # @return dict类型msg数据
-    def preprocesse(self, text_data, database, clients, client_type):
+    def preprocesse(self, text_data, clients, client_type):
         # debug_print("ws preprocesse: %s" % text_data)
         # 防止未登录客户大数据注入, 后续考虑添加高频非法访问屏蔽, 避免普通攻击
         if not self.login_ok and len(text_data) > 200:
@@ -132,9 +145,9 @@ class ClientConsumer(WebsocketConsumer):
         if msg_type is None:  # 无type字段
             self.closeConnect("消息类型错误!")
         elif msg_type == "req_login":  # 登录请求
-            ok = self.login(database, msg_dict, clients, client_type)
+            ok = self.login(msg_dict, clients, client_type)
         elif msg_type == "req_logout":  # 注销
-            self.logout(database, clients)
+            self.logout(clients)
         else:  # 其他消息类型
             if not self.login_ok:  # 未登录,非法访问
                 self.closeConnect("非法访问!")
@@ -161,6 +174,8 @@ class CarClientsConsumer(ClientConsumer):
         self.car_state_channel = None
         self.car_cmd_channel = None
         self.client = None
+        self.client_type = self.CAR_CLIENT_TYPE
+        self.db = CarUser
 
     # 重载父类方法 手动接受连接
     def connect(self):
@@ -169,13 +184,13 @@ class CarClientsConsumer(ClientConsumer):
     # 重载父类方法
     def disconnect(self, close_code):
         # 车端客户断开链接时自动注销
-        self.logout(CarUser, g_car_clients)
+        self.logout(g_car_clients)
 
     # 重载父类方法
     def receive(self, text_data):
         self.on_received(text_data)
 
-        msg_type, msg = self.preprocesse(text_data, CarUser, g_car_clients, CarClient)
+        msg_type, msg = self.preprocesse(text_data, g_car_clients, CarClient)
 
         if msg_type is None:
             return
@@ -194,11 +209,11 @@ class CarClientsConsumer(ClientConsumer):
             # 控制数据写数据库的频率
             now = time.time()
             if not hasattr(self, "last_data_save_time") \
-                    or now - self.last_data_save_time > 1.0 \
+                    or now - self.last_data_save_time >= 1.0 \
                     or self.client.state.changed():
                 try:
                     # 将部分数据存到数据库
-                    car_user = CarUser.objects.get(userid=self.client.id)
+                    car_user = self.db.objects.get(userid=self.client.id)
                     car_user.longitude = self.client.state.longitude
                     car_user.latitude = self.client.state.latitude
                     car_user.system_state = self.client.state.status.get()
@@ -251,10 +266,10 @@ class CarClientsConsumer(ClientConsumer):
 
     def on_login(self):
         # car用户登录成功后, 添加redis订阅
-        self.car_cmd_channel = carCmdChannel(self.user_group, self.user_id)
-        self.car_state_channel = carStateChannel(self.user_group, self.user_id)
-        self.client = g_car_clients[self.user_id]
+        self.car_cmd_channel = carCmdChannel(self.user_groupid, self.user_id)
+        self.car_state_channel = carStateChannel(self.user_groupid, self.user_id)
 
+        # 订阅针对当前car用户的通道(唯一订阅者->唯一回调函数)
         g_pubsub.subscribe(self.car_cmd_channel, self.redisCarCmdCallback)
 
     def on_logout(self):
@@ -263,13 +278,16 @@ class CarClientsConsumer(ClientConsumer):
 
 
 # web端客户端
-class UserClientConsumer(ClientConsumer):
-    thread_run_flag = True
-    report_thread = None
-
-    # 需要监听的客户列表, 根据客户端请求进行配置
-    # car_id: attrs[] # 需要监听的字段, 当为空时则监听所有字段
-    listen_cars = {}
+class WebClientConsumer(ClientConsumer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.thread_run_flag = True
+        self.report_thread = None
+        self.client_type = self.WEB_CLIENT_TYPE
+        self.db = WebUser
+        # 需要监听的客户列表, 根据客户端请求进行配置
+        # car_id: attrs[] # 需要监听的字段, 当为空时则监听所有字段
+        self.listen_cars = {}
 
     # 数据报告线程, 将车辆数据按照一定频率转发到web客户端
     def reportThread(self):
@@ -294,14 +312,14 @@ class UserClientConsumer(ClientConsumer):
         self.thread_run_flag = False
 
         # web用户webSocket断开连接时不注销用户, 防止用户刷新页面后token失效
-        # 仅当http请求注销时进行注销
-        # self.logout(WebUser, g_user_clients)
+        # 仅当请求注销时进行注销
+        # self.logout(g_user_clients)
 
     # 重载父类方法
     def receive(self, text_data):
         self.on_received(text_data)
 
-        msg_type, msg = self.preprocesse(text_data, WebUser, g_user_clients, UserClient)
+        msg_type, msg = self.preprocesse(text_data, g_user_clients, UserClient)
         if msg_type is None:
             return
         response = {"type": msg_type.replace("req", "res"), "msg": "", "code": 0, "data": {}}
@@ -333,7 +351,7 @@ class UserClientConsumer(ClientConsumer):
 
     # 车辆状态信息(组内用户)
     def redisCarStateCallback(self, item):
-        print("web user sub car state:", item)
+        print("web user %s sub car state:" % self.user_name, item)
         data_dict = json.loads(item['data'])
         try:
             self.send(text_data=data_dict.get('body'))  # 转发数据转发到web客户端
@@ -346,8 +364,8 @@ class UserClientConsumer(ClientConsumer):
         self.report_thread.start()
 
         # 订阅组内car用户所有状态信息
-        g_pubsub.psubscribe(carStateChannelPrefix(self.user_group)+'*', self.redisCarStateCallback)
+        g_pubsub.psubscribe(carStateChannelPrefix(self.user_groupid)+'*', self.redisCarStateCallback, self.user_id)
 
     def on_logout(self):
-        pass
+        g_pubsub.punsubscribe(carStateChannelPrefix(self.user_groupid)+'*', self.user_id)
 
