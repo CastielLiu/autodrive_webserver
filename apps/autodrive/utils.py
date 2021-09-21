@@ -28,6 +28,15 @@ def pretty_floats(obj, cnt):
     return obj
 
 
+# 随机字符串
+def randomStr(str_len):
+    res = ''
+    chars = string.ascii_letters + string.digits
+    for i in range(str_len):
+        res += chars[Random().randint(0, len(chars) - 1)]
+    return res
+
+
 # 生成随机令牌,
 # 用户使用帐号密码登录验证成功后生成, 退出后删除
 # 在用户退出之前发起ws请求, 可利用用户名+token进行新验证
@@ -142,21 +151,5 @@ def transmitFromHttpToWebsocket(clients, car_id, content, sync=True):
     return True, response_text
 
 
-def carCmdChannelPrefix(groupid: str):
-    return str(groupid) + "_car_cmd"
 
-
-# 车辆控制指令redis通道
-def carCmdChannel(groupid: str, car_id: str):
-    return carCmdChannelPrefix(groupid) + '_' + car_id
-
-
-# 车辆状态信息通道
-def carStateChannelPrefix(groupid: str):
-    return str(groupid) + "_car_state"
-
-
-# 车辆状态信息通道
-def carStateChannel(groupid: str, car_id: str):
-    return carStateChannelPrefix(groupid) + '_' + car_id
 

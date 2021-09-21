@@ -1,6 +1,7 @@
 import json
 
-import redis, threading
+import redis
+import threading
 from django.conf import settings
 
 
@@ -26,14 +27,37 @@ class PubSub:
         self.pubsub_array = dict()  # 存放新建的私有pubsub
 
     # 添加订阅的通道
-    def subscribe(self, channel, callback):
+    def subscribe(self, channel, callback, private_ps=None):
+        if private_ps:
+            print("subscribe private_ps: %s" % private_ps)
+            if private_ps in self.pubsub_array:  # 已存在则取出
+                pubsub = self.pubsub_array[private_ps]
+                pubsub.subscribe(**{channel: callback})
+            else:  # 不存在则创建
+                pubsub = self.client.pubsub()
+                self.pubsub_array[private_ps] = pubsub
+                pubsub.subscribe(**{channel: callback})
+                pubsub.run_in_thread(10.0)  # 启动监听线程
+            return
+
         self.pubsub.subscribe(**{channel: callback})
         if not self.pubsub_thread_started:
             self.pubsub.run_in_thread(1.0)
             self.pubsub_thread_started = True
 
-    def unsubscribe(self, channel):
-        self.pubsub.unsubscribe(channel)
+    def unsubscribe(self, channel, private_ps):
+        if private_ps:
+            if private_ps not in self.pubsub_array:
+                return
+
+            pubsub = self.pubsub_array[private_ps]
+            pubsub.unsubscribe(channel)
+
+            # 由于subscribed函数被property装饰,因此访问时不能加()
+            if not pubsub.subscribed:  # 无监听通道, 删除监听器pubsub
+                self.pubsub_array.pop(private_ps)
+        else:
+            self.pubsub.unsubscribe(channel)
 
     # 订阅一个或多个给定模式的通道
     # @param private_ps 私有ps名称, 当非None时创建新的self.client.pubsub()
@@ -58,7 +82,7 @@ class PubSub:
             self.pubsub_thread_started = True
 
     def punsubscribe(self, channel, private_ps=None):
-        print("%s in self.pubsub_array?" % private_ps, private_ps in self.pubsub_array)
+        # print("%s in self.pubsub_array?" % private_ps, private_ps in self.pubsub_array)
         if private_ps:
             if private_ps not in self.pubsub_array:
                 return
@@ -97,6 +121,7 @@ class PubSub:
     # @param sync_channel 同步响应的通道
     # @param timeout 响应超时时间 float(s)
     def sync_request(self, channel, msg, sync_channel, timeout=0):
+        print("sync_request-> channel: %s, sync_channel: %s" % (channel, sync_channel))
         request = {'sync': sync_channel, 'timeout': timeout, 'body': msg}
 
         self.sync_cv.acquire()
@@ -119,3 +144,32 @@ class PubSub:
         if error_msg:
             response['error_msg'] = error_msg
         self.client.publish(channel, json.dumps(response))
+
+
+def carCmdChannelPrefix(groupid: str):
+    return str(groupid) + "_car_cmd"
+
+
+# 车辆控制指令redis通道
+def carCmdChannel(groupid: str, car_id: str):
+    return carCmdChannelPrefix(groupid) + '_' + car_id
+
+
+# 车辆状态信息通道前缀(加上*号即可获取所有关联通道)
+def carStateChannelPrefix(groupid: str):
+    return str(groupid) + "_car_state"
+
+
+# 车辆状态信息通道
+def carStateChannel(groupid: str, car_id: str):
+    return carStateChannelPrefix(groupid) + '_' + car_id
+
+
+def userLogioChannel():
+    return "user_logio"
+
+
+# 用户上下线通知redis消息
+def userLogioRedisMsg(user_type, group_id, user_id, login_flag, is_login):
+    msg = {'islogin': int(is_login), 'usertype': user_type, 'groupid': group_id, 'userid': user_id, 'flag': login_flag}
+    return json.dumps(msg)

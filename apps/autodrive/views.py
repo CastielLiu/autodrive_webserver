@@ -9,9 +9,8 @@ from django.contrib.staticfiles.views import serve
 
 import json
 
-from apps.autodrive.redis_pubsub import PubSub
-from apps.autodrive.utils import userLoginCheck, debug_print, userLogout, pretty_floats, queryValuesListByUserId, \
-    transmitFromHttpToWebsocket, carCmdChannel
+from apps.autodrive.redis_pubsub import PubSub, carCmdChannel
+from apps.autodrive.utils import userLoginCheck, debug_print, userLogout, pretty_floats, queryValuesListByUserId
 from apps.autodrive.models import WebUser, CarUser, User, NavPathInfo
 from apps.autodrive.nodes.nav_path import *
 import zipfile
@@ -263,20 +262,28 @@ def main_page(request):
         response['data'] = {'cars_pos': cars_pos}
     elif req_type == "req_start_task" or req_type == "req_stop_task":
         car_id = data.get('car_id')
-
-        channel = carCmdChannel(usergroupid, car_id)
-        # request.body 类型为bytes 需解码为str
-        redis_response = g_pubsub.sync_request(channel, request.body.decode(), sync_channel=channel+'res', timeout=10.0)
-        redis_response_dict = json.loads(redis_response)
-        ok = redis_response_dict['ok']
-        body = redis_response_dict['body']
-
-        if not ok:  # sync_request请求失败
-            response['code'] = 1
-            response['msg'] = redis_response_dict['error_msg']
+        car_user = CarUser.objects.filter(Q(userid=car_id) & Q(is_online=True))
+        if len(car_user) == 0:
+            response['code'] = 2
+            response['msg'] = "Car offline"
         else:
-            response_text = body
-        print("req_start_task, response:", redis_response)
+            channel = carCmdChannel(usergroupid, car_id)
+            # request.body 类型为bytes 需解码为str
+            redis_response = g_pubsub.sync_request(channel, request.body.decode(), sync_channel=channel+'res', timeout=10.0)
+            if redis_response is None:
+                response['code'] = 1
+                response['msg'] = "Request timeout in redis"
+            else:
+                redis_response_dict = json.loads(redis_response)
+                ok = redis_response_dict['ok']
+                body = redis_response_dict['body']
+
+                if not ok:  # sync_request请求失败
+                    response['code'] = 1
+                    response['msg'] = redis_response_dict['error_msg']
+                else:
+                    response_text = body
+            print("req_start_task, response:", redis_response)
     else:
         response['code'] = 1
         response['msg'] = "Unknown request."

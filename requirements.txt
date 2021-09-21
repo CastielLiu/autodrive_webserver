@@ -7,3 +7,4 @@ django==2.2.12
 mysqlclient==2.0.3
 python==3.8.10
 sqlite==3.36.0
+redis~=3.5.3
