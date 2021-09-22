@@ -6,9 +6,9 @@ from django.conf import settings
 
 
 # 自定义redis通信线路协议
-# 请求 request = {'sync': str, 'timeout': float, 'body': str} sync同步响应通道, timeout响应超时时间, body请求体
-# 应答 response = {'ok': bool, 'body': str} ok请求是否成功, body响应体
-# 汇报 report = {'body': str} body汇报体
+# 请求 request = {'sync': str, 'timeout': float, 'body': str/dict} sync同步响应通道, timeout响应超时时间, body请求体
+# 应答 response = {'ok': bool, 'body': str/dict} ok请求是否成功, body响应体
+# 汇报 report = {'body': str/dict} body汇报体
 
 # class Group
 
@@ -45,7 +45,7 @@ class PubSub:
             self.pubsub.run_in_thread(1.0)
             self.pubsub_thread_started = True
 
-    def unsubscribe(self, channel, private_ps):
+    def unsubscribe(self, channel, private_ps=None):
         if private_ps:
             if private_ps not in self.pubsub_array:
                 return
@@ -98,7 +98,7 @@ class PubSub:
         self.pubsub.punsubscribe(channel)
 
     # channel 发布通道
-    # msg 发布消息
+    # msg 发布消息 str/dict
     def publish(self, channel, msg, publisher=None):
         request = {'body': msg}
         if publisher:

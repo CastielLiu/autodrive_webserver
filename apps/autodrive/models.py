@@ -31,12 +31,17 @@ class User(models.Model):
     token = models.CharField('临时令牌', max_length=50, blank=True, null=True)
     is_online = models.BooleanField('是否在线', default=False)
     is_active = models.BooleanField('是否活跃', default=True)
+    # 远程端操作车端用户时, 在数据库中对双方均进行加锁处理, 防止冲突
+    # 上锁后其操作全部拒绝, 并且拒绝新登录(防止正在操作或被操作的用户被挤掉线)
+    op_lock = models.BooleanField('操作锁', default=False)
+
     CarType = "car"
     WebType = "web"
 
 
 class CarUser(User):
-    type = models.CharField('用户类型', max_length=10, default=User.CarType, choices=((User.CarType, User.CarType),), editable=False)
+    type = models.CharField('用户类型', max_length=10, default=User.CarType,
+                            choices=((User.CarType, User.CarType),), editable=False)
     longitude = models.FloatField('经度', default=0.0)
     latitude = models.FloatField('纬度', default=0.0)
     soc = models.IntegerField('剩余电量', default=-1)

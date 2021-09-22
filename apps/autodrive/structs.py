@@ -70,7 +70,8 @@ class ClientConsumerSet:
     # 删除元素 用户退出登录或被迫退出登录时删除
     def remove(self, item):
         self._lock.acquire()
-        self._consumers.pop(item)
+        if item in self._consumers:
+            self._consumers.pop(item)
         self._lock.release()
 
     # 异处登录，强制下线
@@ -78,9 +79,8 @@ class ClientConsumerSet:
         self._lock.acquire()
         consumer = self._consumers.get(item)
         if consumer:
-            print(login_flag, consumer.login_flag)
             if login_flag != consumer.login_flag:  # 登录标志与当前服务器所存储的不同, 即异处登录
-                consumer.closeConnect('{"type": "rep_force_offline"}')
+                consumer.closeConnect('{"type": "rep_force_offline", "test": 0}')
         self._lock.release()
 
     def size(self):

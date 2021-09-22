@@ -18,8 +18,8 @@ g_webConsumers = ClientConsumerSet()
 
 # 客户端消费者基类
 class ClientConsumer(WebsocketConsumer):
-    CAR_CLIENT_TYPE = 0
-    WEB_CLIENT_TYPE = 1
+    CAR_USER_TYPE = CarUser().type
+    WEB_USER_TYPE = WebUser().type
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -30,29 +30,65 @@ class ClientConsumer(WebsocketConsumer):
         self.token = ""
         self.login_ok = False
         self.login_flag = ""  # 登录标志字符串, 用在登录通知消息体中,区分不同的登录
-        self.client_type = None
+        self.user_type = None
         self.db = None  # 数据库
         self.send_lock = threading.Lock()  # 发送数据线程锁
+        self.consumers = None  # WebsocketConsumer集合
+        self.connected = False
+        print("ClientConsumer constructed")
 
+    def __del__(self):
+        print("%s_%s ClientConsumer deconstructed" % (self.user_type, self.user_name))
+
+    # 重载父类方法 手动接受连接
+    def connect(self):
+        self.accept()
+        self.connected = True
+
+    def receive(self, text_data=None, bytes_data=None):
+        try:
+            self.on_received(text_data, bytes_data)
+        except AttributeError as e:
+            debug_print("AttributeError: %s" % e)
+
+    # 重载父类方法
+    def disconnect(self, close_code):
+        self.connected = False
+        self.consumers.remove(self.user_id)
+        self.logout(auto=True)  # 自动退出登录
+
+        debug_print("%s_%s disconnect" % (self.user_type, self.user_name))
+        print("remaind %d %s users." % (self.consumers.size(), self.user_type))
+
+        try:
+            self.on_disconnect(close_code)
+        except AttributeError as e:
+            debug_print("AttributeError: %s" % e)
+
+    # 以安全模式发送数据
+    # 1. 确保用户已登录
+    # 2. 加锁发送, 防止多线程冲突
+    # 3. 异常捕获
     def safetySend(self, text_data=None, bytes_data=None, close=False):
+        if not self.connected:
+            return False
+
         ok = True
         try:
             self.send_lock.acquire()
             self.send(text_data, bytes_data, close)
         except Exception as e:
+            debug_print("safetySend '%s' failed: %s" % (text_data, e))
             ok = False
         finally:
             self.send_lock.release()
-
-        if not ok and self.login_ok:  # 发送失败且已登录, 则自动退出登录
-            self.logout()
 
         return ok
 
     # 关闭连接, response: 关闭回应
     def closeConnect(self, response=None):
         if response:
-            debug_print("closeConnect", response)
+            print("closeConnect", response)
             self.safetySend(response)
         self.close()
 
@@ -90,46 +126,52 @@ class ClientConsumer(WebsocketConsumer):
         self.safetySend(json.dumps(response))
 
         # 调用子类登录成功‘回调函数’(如果有)
-        on_login = getattr(self, "on_login", None)
-        if on_login:
-            on_login()
+        # on_login = getattr(self, "on_login", None)
+        # if on_login:
+        #     on_login()
+        try:
+            self.on_login()
+        except AttributeError as e:
+            debug_print("AttributeError: %s" % e)
 
         # 以广播形式通知用户上线时, 所有服务器(包括当前服务器)将收到通知, 若通知的用户已在当前服务器登录, 则做下线处理
         # 但当前服务器若收到自己的通知消息, 则不做处理. 否则将导致刚登录的用户被下线
         # 登录标志字符串用于区分是否为自我发送
-        self.login_flag = str(time.time())+'_'+randomStr(5)
+        self.login_flag = str(time.time()) + '_' + randomStr(5)
         g_pubsub.publish(userLogioChannel(),
-                         userLogioRedisMsg(self.client_type, self.user_groupid, self.user_id, self.login_flag, True))
-        if self.client_type == self.CAR_CLIENT_TYPE:
-            g_carConsumers.add(self.user_id, self)
-        elif self.client_type == self.WEB_CLIENT_TYPE:
-            g_webConsumers.add(self.user_id, self)
+                         userLogioRedisMsg(self.user_type, self.user_groupid, self.user_id, self.login_flag, True))
+        self.consumers.add(self.user_id, self)
 
         # print("login: ", self.login_ok, data_dict)
         return True
 
     # 注销用户
-    def logout(self):
-        if self.client_type == self.CAR_CLIENT_TYPE:
-            consumers = g_carConsumers
-        elif self.client_type == self.WEB_CLIENT_TYPE:
-            consumers = g_webConsumers
-        else:
+    # param auto 是否为自动注销
+    def logout(self, auto=False):
+        if self.login_ok:
+            if self.user_id in self.consumers:
+                self.consumers.remove(self.user_id)  # 从集合中删除
+                print("user: %s logout, remaind %d %s users" % (self.user_id, self.consumers.size(), self.user_type))
+        else:  # 已经离线, 无需重复执行 (当连接断开时, 将自动调用退出登录)
             return
 
-        if self.login_ok and self.user_id in consumers:
-            consumers.remove(self.user_id)  # 从集合中删除
-            print("user: %s logout, remaind %d %s users" % (self.user_id, consumers.size(), self.client_type))
+        userLogout(self.db, self.user_name, auto=auto)
 
-        userLogout(self.db, self.user_name, update_db=True)  # 在数据库中标注离线
+        # 先将login_ok复位, 再关闭连接, 防止循环调用
         self.login_ok = False
-        self.closeConnect()
+        self.close()  # 关闭连接
+
         # 调用子类注销成功‘回调函数’(如果有)
-        on_logout = getattr(self, "on_logout", None)
-        if on_logout:
-            on_logout()
+        # on_logout = getattr(self, "on_logout", None)
+        # if on_logout:
+        #     on_logout()
+        try:
+            self.on_logout()
+        except AttributeError as e:
+            debug_print("AttributeError: %s" % e)
         g_pubsub.publish(userLogioChannel(),
-                         userLogioRedisMsg(self.client_type, self.user_groupid, self.user_id, self.login_flag, False))  # 下线通知
+                         userLogioRedisMsg(self.user_type, self.user_groupid, self.user_id, self.login_flag,
+                                           False))  # 下线通知
 
     # 客户端消息预处理, 格式错误处理, 登录注销
     # @param text_data客户端消息
@@ -167,12 +209,6 @@ class ClientConsumer(WebsocketConsumer):
 
         return None, None  # 数据无需继续处理
 
-    def on_received(self, text_data):
-        # debug_print("consumer线程id: %d, 总线程数: %d" % (threading.currentThread().ident, len(threading.enumerate())))
-        # self.safetySend("server received %s" % text_data)
-        # debug_print("ws_receive: ", text_data)
-        pass
-
 
 # 车端客户端数据消费者
 class CarClientsConsumer(ClientConsumer):
@@ -180,29 +216,20 @@ class CarClientsConsumer(ClientConsumer):
         super().__init__(*args, **kwargs)
         self.car_state_channel = None  # 车辆状态数据通道
         self.car_cmd_channel = None  # 车辆调度控制指令通道
-        self.client = None
-        self.client_type = self.CAR_CLIENT_TYPE
+        self.user_type = self.CAR_USER_TYPE
         self.db = CarUser
+        self.consumers = g_carConsumers
 
         self.state = CarState()  # 车辆状态
         self.sync_req_cv = threading.Condition()  # 同步请求条件变量
         self.sync_req_response = ""  # 同步请求应答结果
 
-    # 重载父类方法 手动接受连接
-    def connect(self):
-        self.accept()
+    def on_disconnect(self, close_code):
+        pass
 
     # 重载父类方法
-    def disconnect(self, close_code):
-        # 车端客户断开链接时自动注销
-        self.logout()
-
-    # 重载父类方法
-    def receive(self, text_data):
-        self.on_received(text_data)
-
+    def on_received(self, text_data, bytes_data):
         msg_type, msg = self.preprocesse(text_data)
-
         if msg_type is None:
             return
         if msg_type == "rep_car_state":  # 车端向服务器上报状态信息, 服务器向web端转发并定时保存到数据库
@@ -232,11 +259,10 @@ class CarClientsConsumer(ClientConsumer):
                     self.last_data_save_time = now
                 except Exception as e:
                     print(e)
-
         # 车端回应任务请求
         elif msg_type == "res_start_task" or \
                 msg_type == "res_stop_task":  # 车端回应任务请求
-            print(msg_type, msg_type, msg_type)
+
 
             # 收到车端对任务请求的响应, 唤醒请求线程进行通知
             self.sync_req_cv.acquire()
@@ -246,7 +272,7 @@ class CarClientsConsumer(ClientConsumer):
         elif msg_type == "rep_taskdone" or \
                 msg_type == "rep_taskfeedback":
             # 转发到web客户端
-            g_pubsub.publish(channel=self.car_state_channel, msg=msg)
+            g_pubsub.publish(channel=self.car_state_channel, msg=msg)  # this msg is dict
         else:
             print("Unknown msg type: %s!" % msg_type)
 
@@ -256,7 +282,11 @@ class CarClientsConsumer(ClientConsumer):
         sync_channel = data_dict.get('sync')  # 请求的同步响应通道(指令发送者期望通过该通道获取响应)
         error_msg = None
 
-        send_ok = self.safetySend(text_data=data_dict.get('body'))  # 转发cmd到车端
+        body = data_dict.get('body')
+        if isinstance(body, dict):
+            send_ok = self.safetySend(text_data=json.dumps(body))
+        else:
+            send_ok = self.safetySend(text_data=data_dict.get('body'))  # 转发cmd到车端
 
         if sync_channel is None:  # 无需同步响应
             return
@@ -272,7 +302,7 @@ class CarClientsConsumer(ClientConsumer):
             if not gotit:
                 error_msg = "Request timeout in driverless server."
 
-        print("self.sync_req_response", self.sync_req_response)
+        print("self.sync_req_response: ", self.sync_req_response)
         g_pubsub.sync_response(sync_channel, self.sync_req_response, error_msg)
         self.sync_req_response = ""
         self.sync_req_cv.release()
@@ -296,8 +326,9 @@ class WebClientConsumer(ClientConsumer):
         super().__init__(*args, **kwargs)
         self.thread_run_flag = True
         self.report_thread = None
-        self.client_type = self.WEB_CLIENT_TYPE
+        self.user_type = self.WEB_USER_TYPE
         self.db = WebUser
+        self.consumers = g_webConsumers
         # 需要监听的客户列表, 根据客户端请求进行配置
         # car_id: attrs[] # 需要监听的字段, 当为空时则监听所有字段
         self.listen_cars = {}
@@ -316,22 +347,14 @@ class WebClientConsumer(ClientConsumer):
             #     print("reportThread error", e)
             time.sleep(0.1)
 
-    # 重载父类方法 手动接受连接
-    def connect(self):
-        self.accept()
-
-    # 重载父类方法
-    def disconnect(self, close_code):
+    def on_disconnect(self, close_code):
         self.thread_run_flag = False
-
         # web用户webSocket断开连接时不注销用户, 防止用户刷新页面后token失效
         # 仅当请求注销时进行注销
         # self.logout()
 
     # 重载父类方法
-    def receive(self, text_data):
-        self.on_received(text_data)
-
+    def on_received(self, text_data, bytes_data):
         msg_type, msg = self.preprocesse(text_data)
         if msg_type is None:
             return
@@ -355,9 +378,15 @@ class WebClientConsumer(ClientConsumer):
 
     # 车辆状态信息(组内用户)
     def redisCarStateCallback(self, item):
-        print("web user %s sub car state:" % self.user_name, item)
+        # print("web user %s sub car state:" % self.user_name, item)
         data_dict = json.loads(item['data'])
-        self.safetySend(text_data=data_dict.get('body'))  # 转发数据转发到web客户端
+
+        body = data_dict.get('body')
+        # 转发数据转发到web客户端
+        if isinstance(body, dict):
+            send_ok = self.safetySend(text_data=json.dumps(body))
+        else:
+            send_ok = self.safetySend(text_data=data_dict.get('body'))
 
     def on_login(self):
         # 启动数据自动上报线程
@@ -380,12 +409,12 @@ def userLoginLogoutInfoCallback(item):
     groupid = loginout_data['groupid']
     userid = loginout_data['userid']
     login_flag = loginout_data['flag']
-    
-    if usertype == ClientConsumer.WEB_CLIENT_TYPE:  # web用户
+
+    if usertype == ClientConsumer.WEB_USER_TYPE:  # web用户
         if islogin and userid in g_webConsumers:
             g_webConsumers.forceOffline(userid, login_flag)
 
-    elif usertype == ClientConsumer.CAR_CLIENT_TYPE:  # car用户
+    elif usertype == ClientConsumer.CAR_USER_TYPE:  # car用户
         pass
 
     print("userLoginLogoutInfoCallback", item['data'])

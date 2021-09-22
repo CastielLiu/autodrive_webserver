@@ -51,26 +51,27 @@ def randomToken(token_len=10):
     return token
 
 
-# @param update_db, 是否更新到数据库
-def userLogout(database, username, update_db=False):
-    if update_db:
-        try:
-            # 使用Q对象筛选用户, 查找username或userid匹配的用户
-            db_user = database.objects.get(Q(username=username) | Q(userid=username) & Q(is_active=True))
+# @param auto, 是否为自动退出(一般连接断开时自动退出登录, 用户点击退出按钮为手动)
+def userLogout(database, username, auto=False):
+    try:
+        # 使用Q对象筛选用户, 查找username或userid匹配的用户
+        db_user = database.objects.get(Q(username=username) | Q(userid=username) & Q(is_active=True))
+        db_user.is_online = False
+        if not auto:
             db_user.session_key = ""
-            db_user.token = None
-            db_user.is_online = False
-            db_user.save()
-        except Exception as e:
-            print(e)
-            return False
+            db_user.token = None  #
+
+        db_user.save()
+    except Exception as e:
+        print(e)
+        return False
 
 
 # 用户登录验证, 使用user_id/user_name + password/token进行登录验证
 # @param database: 用户信息数据库
 # @param user_id, user_name, password, token: 用户请求登录验证的数据
 # @param update_db, 是否更新到数据库
-# @param session_key 会话id
+# @param session_key 会话id(参数非空时将其写入到数据库, 并生成token)
 # @return 验证结果
 def userLoginCheck(database, user_id, user_name, password, token="", session_key=""):
     result = {"ok": False, "info": ""}

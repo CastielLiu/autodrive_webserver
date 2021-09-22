@@ -32,7 +32,7 @@ def render_login_page(request, _locals={}, *args):
     return response
 
 
-# 判断会话是否异常
+# 判断会话是否异常, 虽然服务器保留了客户会话, 但若保留的会话名与数据库中存储的不一致, 则表明客户在其他服务器登录, 导致会话id被修改
 def session_err(request):
     # 获取指定用户名以及会话id的用户, 若用户数为0, 则表明会话已经失效
     users = User.objects.filter(Q(session_key=request.session.session_key) &
@@ -140,7 +140,6 @@ def logout_page(request):
     # debug_print(request.session.get('username'), "logout")
     userLogout(WebUser, request.session.get('username'))
     request.session.clear()  # 清空会话数据
-
     # 从定向到登录页面
     return render_login_page(request)
 
@@ -302,3 +301,4 @@ def test_page(request):
 @check_login
 def uploaded_serve(request, path, document_root=None, show_indexes=False):
     return static.serve(request, path, document_root, show_indexes)
+
