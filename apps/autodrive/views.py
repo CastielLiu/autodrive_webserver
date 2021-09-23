@@ -44,6 +44,13 @@ def session_err(request):
     return False
 
 
+# 手动检验是否登录
+def manual_check_login(request):
+    if request.session.get('is_login', False) and not session_err(request):
+        return True
+    return False
+
+
 # Create your views here.
 # 说明：这个装饰器的作用，就是在每个视图函数被调用时，都验证下有没有登录
 # 如果有过登录，则可以执行新的视图函数，
@@ -100,7 +107,7 @@ def login_page(request):
         login_res = userLoginCheck(CarUser, username, username, password, session_key=session_key)
     else:
         return HttpResponse("Error user type")
-    print("http_login_res", login_res)
+    # print("http_login_res", login_res)
     if login_res['ok']:  # 登录成功 ,标记 is_login
         # print("登录成功", login_res)
         request.session['is_login'] = True
@@ -166,7 +173,7 @@ def main_page(request):
         response.set_cookie('token', token)
         response.set_cookie('groupid', usergroupid)
         return response
-    debug_print("http_receive: %s" % str(request.body))
+    # debug_print("http_receive: %s" % str(request.body))
 
     reqest_body = json.loads(request.body)
     req_type = reqest_body.get("type", "")
@@ -289,7 +296,7 @@ def main_page(request):
 
     if response_text is None:
         response_text = json.dumps(response)
-    debug_print("http_response:", response_text)
+    # debug_print("http_response:", response_text)
     return HttpResponse(response_text)
 
 
@@ -298,7 +305,15 @@ def test_page(request):
 
 
 # 自定义上传文件服务视图函数(调用内置静态文件服务), 以确保访问权限
-@check_login
+# @check_login
 def uploaded_serve(request, path, document_root=None, show_indexes=False):
-    return static.serve(request, path, document_root, show_indexes)
+    http_ref = request.META.get('HTTP_REFERER')
+
+    # 访问来源为admin管理后台 或者 已登录用户
+    if (http_ref and http_ref.find(settings.ADMIN_URL) != -1) or manual_check_login(request):
+        return static.serve(request, path, document_root, show_indexes)
+
+    return HttpResponseNotFound(request)
+
+
 

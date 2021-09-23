@@ -92,7 +92,13 @@ def userLoginCheck(database, user_id, user_name, password, token="", session_key
         result['info'] = "Error password or token"
         return result
 
-    if session_key:
+    # 用户已在线且处于操作锁定状态, 禁止其他用户登录
+    if db_user.is_online and db_user.op_lock:
+        result['ok'] = False
+        result['info'] = ""
+        return result
+
+    if session_key:  # session_key 非空, 表明为新会话, 保存并生成token
         db_user.session_key = session_key
         db_user.token = randomToken(20)  # 登录验证成功, 生成token并存储在数据库
     else:

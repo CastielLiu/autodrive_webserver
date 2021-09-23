@@ -83,5 +83,16 @@ class ClientConsumerSet:
                 consumer.closeConnect('{"type": "rep_force_offline", "test": 0}')
         self._lock.release()
 
+    # 通知web端cars上下线(仅通知在线的组内用户)
+    def carsLogioAttentionWeb(self, groupid, userid, islogin):
+        report = {"type": "rep_logio", "userid": userid, "islogin": islogin}
+        report_str = json.dumps(report)
+
+        self._lock.acquire()
+        for consumer in self._consumers.values():
+            if consumer.user_groupid == groupid:
+                consumer.safetySend(report_str)
+        self._lock.release()
+
     def size(self):
         return len(self._consumers)

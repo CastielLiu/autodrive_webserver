@@ -14,6 +14,7 @@ from .utils import *
 g_pubsub = PubSub()
 g_carConsumers = ClientConsumerSet()
 g_webConsumers = ClientConsumerSet()
+instance_cnt = 0
 
 
 # 客户端消费者基类
@@ -35,10 +36,16 @@ class ClientConsumer(WebsocketConsumer):
         self.send_lock = threading.Lock()  # 发送数据线程锁
         self.consumers = None  # WebsocketConsumer集合
         self.connected = False
-        print("ClientConsumer constructed")
+
+        # global instance_cnt
+        # instance_cnt = instance_cnt + 1
+        # print("ClientConsumer constructed ", instance_cnt)
 
     def __del__(self):
-        print("%s_%s ClientConsumer deconstructed" % (self.user_type, self.user_name))
+        # global instance_cnt
+        # instance_cnt = instance_cnt - 1
+        # print("%s_%s ClientConsumer deconstructed" % (self.user_type, self.user_name))
+        pass
 
     # 重载父类方法 手动接受连接
     def connect(self):
@@ -107,11 +114,10 @@ class ClientConsumer(WebsocketConsumer):
             token = data_dict.get("token", "")
 
             login_res = userLoginCheck(self.db, user_id, user_name, password, token)
-            print("ws_login_res", login_res)
+            # print("ws_login_res", login_res)
             if login_res['ok']:
                 response["code"] = 0
                 response["msg"] = login_res['info']
-                debug_print("login check.", response)
             else:
                 response["code"] = 1
                 response["msg"] = login_res['info']
@@ -411,13 +417,13 @@ def userLoginLogoutInfoCallback(item):
     login_flag = loginout_data['flag']
 
     if usertype == ClientConsumer.WEB_USER_TYPE:  # web用户
-        if islogin and userid in g_webConsumers:
+        if islogin and userid in g_webConsumers:  # web用户上线且在当前服务器处于登录状态
             g_webConsumers.forceOffline(userid, login_flag)
 
     elif usertype == ClientConsumer.CAR_USER_TYPE:  # car用户
-        pass
+        g_webConsumers.carsLogioAttentionWeb(groupid, userid, islogin)  # car用户上下线提醒
 
-    print("userLoginLogoutInfoCallback", item['data'])
+    # print("userLoginLogoutInfoCallback", item['data'])
     pass
 
 

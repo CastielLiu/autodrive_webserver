@@ -23,7 +23,7 @@ from django.views.generic import RedirectView
 from . import views
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path(settings.ADMIN_URL, admin.site.urls),
 
     # 当django配置为非调试模式并由runserver运行时将无法处理静态文件
     # 通过此配置使其能够响应静态文件请求(当使用nginx代理时, 不再经过此路由, 静态文件由nginx托管)

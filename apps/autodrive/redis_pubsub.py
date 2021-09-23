@@ -29,7 +29,7 @@ class PubSub:
     # 添加订阅的通道
     def subscribe(self, channel, callback, private_ps=None):
         if private_ps:
-            print("subscribe private_ps: %s" % private_ps)
+            # print("subscribe private_ps: %s" % private_ps)
             if private_ps in self.pubsub_array:  # 已存在则取出
                 pubsub = self.pubsub_array[private_ps]
                 pubsub.subscribe(**{channel: callback})
@@ -65,7 +65,7 @@ class PubSub:
     #                   使用多个私有ps订阅相同的通道则解决了此问题(依靠Redis.PubSub的多线程)
     def psubscribe(self, channel, callback, private_ps=None):
         if private_ps:
-            print("psubscribe private_ps: %s" % private_ps)
+            # print("psubscribe private_ps: %s" % private_ps)
             if private_ps in self.pubsub_array:  # 已存在则取出
                 pubsub = self.pubsub_array[private_ps]
                 pubsub.psubscribe(**{channel: callback})
