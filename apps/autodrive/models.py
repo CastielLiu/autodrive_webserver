@@ -14,6 +14,12 @@ class UserGroup(models.Model):
     name = models.CharField('用户组名称', max_length=20, unique=True)
     supergroup = models.BooleanField('超级用户组', default=False)
 
+    # 内建Meta类
+    class Meta:
+        # db_table = 'navpathinfo'  # 重命名数据库表名, 默认按照系统规则命名
+        verbose_name = '用户组'  # 用于admin后台显示的名字(单数), 否则为默认值
+        verbose_name_plural = verbose_name
+
 
 def default_user_group():
     return UserGroup.objects.get_or_create(name="guest")[0].id
@@ -47,10 +53,22 @@ class CarUser(User):
     soc = models.IntegerField('剩余电量', default=-1)
     system_state = models.CharField('系统状态', max_length=30, default="unknown")
 
+    # 内建Meta类
+    class Meta:
+        # db_table = 'navpathinfo'  # 重命名数据库表名, 默认按照系统规则命名
+        verbose_name = '车端用户'  # 用于admin后台显示的名字(单数), 否则为默认值
+        verbose_name_plural = verbose_name
+
 
 class WebUser(User):
     type = models.CharField('用户类型', max_length=10, default=User.WebType, choices=((User.WebType, User.WebType),), editable=False)
     is_super = models.BooleanField('是否超级用户', default=False)
+
+    # 内建Meta类
+    class Meta:
+        # db_table = 'navpathinfo'  # 重命名数据库表名, 默认按照系统规则命名
+        verbose_name = '远程端用户'  # 用于admin后台显示的名字(单数), 否则为默认值
+        verbose_name_plural = verbose_name
 
 
 # 导航路径信息模型
@@ -59,7 +77,7 @@ class NavPathInfo(models.Model):
     # @param instance 当前模型实例
     # @param filename 上传时的文件名
     def file_path(self, filename):  # groupid+pathid
-        return '%s/%s/%s/%s' % ('autodrive_paths', 'group_' + str(self.uploader.group.id), 'path_' + str(self.id), filename)
+        return '%s/%s/%s/%s' % ('autodrive_paths', 'group_' + str(self.uploader.group.id), 'path_' + str(self.name), filename)
 
     id = models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')
     # 关联上传者, 删除时不设保护
@@ -75,7 +93,8 @@ class NavPathInfo(models.Model):
                                       max_upload_size=5242880, content_types=['text/plain'])
     extend_file = RestrictedFileField(upload_to=file_path, verbose_name="路径拓展文件", null=True, blank=True,
                                       max_upload_size=2621440, content_types=['text/xml'])
-    # 路径名称中不允许包含特殊字符, 不允许重复
+
+    # 路径名称中不允许包含特殊字符, 不允许重复, 禁止修改(文件路径在模型创建时已由name确定, name修改后可能导致新建模型时路径重复而被改写)
     name = models.CharField('路径名称', max_length=30, null=True, blank=False, unique=True)
     is_active = models.BooleanField('是否活跃', default=True)  # 请求删除时标记为False, 便于删除后找回
 

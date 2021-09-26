@@ -59,7 +59,10 @@ def getNavPathTraj(group_id, path_id):
     try:
         with open(navpath.points_file.path) as f:
             line = f.readline()
-            titles = line.split()
+            if not line.startswith('title:'):
+                return False, 'No title in points file'
+
+            titles = line.split()[1:]
             info_cnt = len(titles)
             if info_cnt < 2:
                 return False, 'Invalid title count in path', None

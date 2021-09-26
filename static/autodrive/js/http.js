@@ -5,8 +5,8 @@ function HttpRequest2(obj) {
         // csrf防御请求头
         'X-CSRFToken': tools.getCookie('csrftoken'),
     };
-    console.log(typeof(obj.async)=="undefined");
-    console.log(obj.async || true);
+//    console.log(typeof(obj.async)=="undefined");
+//    console.log(obj.async || true);
     return $.ajax({
         url: obj.url || "",
         type: obj.type || 'POST',
@@ -113,7 +113,13 @@ function requestCarsPosition(){
             code = dict.code;
             msg = "";
             if(code === 0){
-                window.mapctrler.addCarsMarker(dict.data.cars_pos);
+                // 'cars_pos': [{'car_id': xx, 'lat': xx, 'lng': xx, 'online': xx}]
+                var cars_pos = dict.data.cars_pos;
+                var BMapPointsWGS84 = [];
+                for(var i = 0, pointsLen = cars_pos.length; i < pointsLen; i++){
+                    BMapPointsWGS84.push(new BMap.Point(cars_pos[i].lng, cars_pos[i].lat));
+                }
+                window.mapctrler.addCarsMarkerWGS84(cars_pos, {points: BMapPointsWGS84, status: 0});
             }
         }
     });
@@ -163,8 +169,10 @@ function requestPathTraj(pathid){
             code = dict.code;
             msg = "";
             if(code === 0){
-                window.mapctrler.addPathLine(dict.data.points);
-                window.mapctrler.setZoom(dict.data.points);
+                var pathid = dict.data.id;
+                var path_name = dict.data.name;
+
+                window.mapctrler.addPathLineWGS84({id: pathid, name: path_name, batch: 0}, {points: dict.data.points, status: 0});
             }
         },
     });
