@@ -1,3 +1,4 @@
+import os
 from functools import wraps
 
 from django.conf import settings
@@ -29,6 +30,9 @@ def render_login_page(request, _locals={}, *args):
 
     # 针对不支持重定向的AJAX请求，返回一个URL，由其自行请求新页面
     response['REDIRECT'] = request.build_absolute_uri() + "login/"
+
+    # 在header中添加登录标志 便于前后端分离的程序判断
+    response['LOGIN'] = False
     return response
 
 
@@ -157,7 +161,7 @@ def main_page(request):
     usergroup = request.session.get("usergroup", "Unknown")  # 用户组
     usergroupid = request.session.get('groupid')  # 用户组id
     is_super = request.session.get("is_super", False)  # 超级用户
-
+    # print("process pid: %s" % os.getpid())
     # print("所属组：", usergroup, "是否为超级用户:", is_super)
 
     if request.method == "GET":
@@ -167,6 +171,7 @@ def main_page(request):
             return render_login_page(request)
 
         response = render(request, 'autodrive/index.html', locals())
+        response['LOGIN'] = True
         # 将token与userid经cookie发送给用户, 用户登录验证websocket
         # 最初方案为保存userame但测试表明cookie设置中文出现问题, 从而修改为保存id
         response.set_cookie('userid', userid)
@@ -258,8 +263,8 @@ def main_page(request):
                 cars_pos.append({'car_id': carid, 'lat': _data[0], 'lng': _data[1],
                                  'online': _data[2]})
 
-        cars_pos.append({'car_id': 'test_car', 'lat': 33.37287, 'lng': 120.15607,
-                         'online': False})
+        # cars_pos.append({'car_id': 'test_car', 'lat': 33.37287, 'lng': 120.15607,
+        #                  'online': False})
 
         if len(cars_pos):
             response['code'] = 0

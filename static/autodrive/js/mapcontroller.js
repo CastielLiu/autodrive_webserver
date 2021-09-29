@@ -26,6 +26,21 @@
         map: window.map,
 
         init: function(){
+            // 设置地图主题
+            //默认地图样式(normal)
+            //清新蓝风格(light)
+            //黑夜风格(dark)
+            //清新蓝绿风格(bluish)
+            //高端灰风格(grayscale)
+            //强边界风格(hardedge)
+            //青春绿风格(darkgreen)
+            //浪漫粉风格(pink)
+            //午夜蓝风格(midnight)
+            //自然绿风格(grassgreen)
+            //精简风格(googlelite)
+            //红色警戒风格(redalert)
+            this.map.setMapStyle({style : "normal"});  // some error
+
             // 初始化地图，设置中心点和显示级别
             //this.map.centerAndZoom(new BMap.Point(116.316967, 39.990748), 15);
             this.map.centerAndZoom(new BMap.Point(120.16575, 33.3794), 17);

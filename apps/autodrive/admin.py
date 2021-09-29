@@ -6,7 +6,7 @@ from .models import *
 # 模型管理器类 - 为后台管理界面添加便于操作的新功能
 class UserManager(admin.ModelAdmin):
     # 需要列表显示的字段
-    list_display = ['is_active', 'userid', 'username', 'group', 'password', 'type', 'is_online']
+    list_display = ['is_online', 'is_active', 'userid', 'username', 'group', 'login_time']
     # 控制list_display中的字段, 哪些可以超链接到修改页面
     list_display_links = ['userid']
     # 添加过滤器

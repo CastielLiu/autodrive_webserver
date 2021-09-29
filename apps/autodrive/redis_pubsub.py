@@ -170,6 +170,7 @@ def userLogioChannel():
 
 
 # 用户上下线通知redis消息
-def userLogioRedisMsg(user_type, group_id, user_id, login_flag, is_login):
-    msg = {'islogin': int(is_login), 'usertype': user_type, 'groupid': group_id, 'userid': user_id, 'flag': login_flag}
+def userLogioRedisMsg(user_type, group_id, user_id, login_time, is_login):
+    msg = {'islogin': int(is_login), 'usertype': user_type, 'groupid': group_id,
+           'userid': user_id, 'logintime': login_time}
     return json.dumps(msg)

@@ -8,6 +8,7 @@
         test_key2: null,
         core_ws: null,
         core_ws_login: 0,
+        core_ws_initiative_close: 0,  //主动关闭(收到被迫下线信息/xx)
         update_cars_clock: null,
 
         user_groupname: $('#active_usergroup').html(),
@@ -70,10 +71,13 @@
                 ws.onmessage = function(msg){
                     console.log("msg");
                 }
-
                 ws.onclose = function(){
-
                 }
+            });
+            $(document).on('click', '#wsSendBtn', function(e){
+                var msg = JSON.stringify({"type": "test", "data": {"ping": $('#ws_test_data').val()}});
+                console.log(msg);
+               _this.core_ws.send(msg);
             });
 
             $(document).on('click', '#flush_online_cars', function(e){
@@ -94,6 +98,7 @@
             });
             // 显示某车辆位置
             $(document).on('click', '.showCarPos', function(){
+                //处理全选与全不选事件逻辑
                 var flag = $(this).prop("checked");
                 if (!flag) {
                     $("#showAllCarsPos").prop("checked", flag);
@@ -102,6 +107,7 @@
                         $("#showAllCarsPos").prop("checked", flag);
                     }
                 }
+                // 先关闭定时器,再按需打开
                 window.clearInterval(_this.update_cars_clock);
                 if($(".showCarPos:checked").length > 0){
                     _this.update_cars_clock = setInterval(requestCarsPosition, 1000);
@@ -200,7 +206,6 @@
 
         ws_logout: function(){
             this.core_ws.send(JSON.stringify({"type": "req_logout", "data": {}}));
-
         },
 
         //websocket连接
@@ -257,9 +262,11 @@
                     }
                 }
                 else if(type == "rep_force_offline"){
+                    _this.core_ws_initiative_close = 1;
+                    _this.core_ws.close();  //先关闭连接, 再alert, 因为alert是阻塞的
                     alert("异处登录，您已被迫下线，可刷新页面重新登录");
-                    loginInfo.innerHTML = "异处登录，您已被迫下线，可刷新页面重新登录";
-                    _this.core_ws.close();
+                    loginInfo.innerHTML = "异处登录，您已被迫下线，可刷新页面重新登录!";
+                    location.reload();
                 }
                 else if(type == "rep_car_state"){
                   // 状态数据
@@ -274,14 +281,19 @@
                 }
             };
             this.core_ws.onclose = function(evt){
+                // 更新状态数据显示
                 if(_this.core_ws_login)
                 {
                     connectBtn.name = "connect";
                     connectBtn.innerHTML = "连接";
                     _this.core_ws_login = 0;
                 }
-                console.log("core_ws close, try to reconnect");
-                _this.connect_core_ws(); //重新连接, 若不进行重连, 实时信息将无法接收
+                // 如果非主动关闭(网络错误等),则尝试再次登录
+                // 若不进行重连, 实时信息将无法接收
+                if(_this.core_ws_initiative_close == 0){
+                    console.log("core_ws close, try to reconnect");
+                    _this.connect_core_ws();
+                }
             };
         },
     };

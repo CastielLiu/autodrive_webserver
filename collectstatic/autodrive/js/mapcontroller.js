@@ -26,6 +26,21 @@
         map: window.map,
 
         init: function(){
+            // 设置地图主题
+            //默认地图样式(normal)
+            //清新蓝风格(light)
+            //黑夜风格(dark)
+            //清新蓝绿风格(bluish)
+            //高端灰风格(grayscale)
+            //强边界风格(hardedge)
+            //青春绿风格(darkgreen)
+            //浪漫粉风格(pink)
+            //午夜蓝风格(midnight)
+            //自然绿风格(grassgreen)
+            //精简风格(googlelite)
+            //红色警戒风格(redalert)
+            this.map.setMapStyle({style : "normal"});  // some error
+
             // 初始化地图，设置中心点和显示级别
             //this.map.centerAndZoom(new BMap.Point(116.316967, 39.990748), 15);
             this.map.centerAndZoom(new BMap.Point(120.16575, 33.3794), 17);
@@ -89,21 +104,22 @@
             });
         },
 
-        // 创建图标对象
-        addCarsMarker: function(cars_pos) {
-            _this = this;
-            //'cars_pos': [{'car_id': xx, 'lat': xx, 'lng': xx, 'online': xx}]
+        // 利用BD09坐标 创建图标对象
+        addCarsMarkerBD09: function(cars_pos, data){
+            if(data.status != 0){
+                return;
+            }
+            var points = data.points;
             var point, marker;
             // 创建标注对象并添加到地图
-            for (var i = 0, pointsLen = cars_pos.length; i < pointsLen; i++) {
-
-                point = new BMap.Point(cars_pos[i].lng, cars_pos[i].lat);
+            for (var i = 0, len = points.length; i < len; i++) {
+                point = points[i];
 //                console.log(point);
                 // 判断正常或者故障，根据不同装填显示不同Icon
                 var myIcon = new BMap.Icon("/static/autodrive/imgs/normal.png", new BMap.Size(32, 32), {
                         // 指定定位位置
                         offset: new BMap.Size(16, 32),
-                        // 当需要从一幅较大的图片中截取某部分作为标注图标时，需要指定大图的偏移位置
+                        // 当需要从一幅较大的图片中截取某部分作为标注图标时, 需要指定大图的偏移位置
                         // imageOffset: new BMap.Size(0, -12 * 25)
                     });
                 // 创建一个图像标注实例
@@ -112,9 +128,16 @@
                 });
                 // 将覆盖物添加到地图上
                 this.map.addOverlay(marker);
-                this.map.centerAndZoom(point, 17);
 
-                console.log(cars_pos[i])
+//                var allOverlay = map.getOverlays();
+//                for (var i = 0; i < allOverlay.length -1; i++){
+//                    if(allOverlay[i].getLabel().content == "我是id=1"){
+//                        map.removeOverlay(allOverlay[i]);
+//                        return false;
+//                    }
+//                }
+
+                this.map.centerAndZoom(point, 17);
 
                 var sContent = "车辆ID:" + cars_pos[i].car_id + "<br>速度: 0.0km/h";
                 var opts = {
@@ -134,14 +157,29 @@
             }
         },
 
+        // 利用wgs84坐标 创建图标对象
+        addCarsMarkerWGS84: function(cars_pos, data) {
+            var points = data.points;
+            // 'cars_pos': [{'car_id': xx, 'lat': xx, 'lng': xx, 'online': xx}]
+            _this = this;
+
+            // 调用百度API将WGS84转为BD09
+            var convertor = new BMap.Convertor();
+            convertor.translate(points, 1, 5, _this.addCarsMarkerBD09.bind(_this, cars_pos));
+        },
+
         // 弹窗增加点击事件
 //        function func(data) {
 //            alert("点击了机器编号为：" + data + "\n");
 //        }
 
-        addPathLine: function(pointArr) {
-            // 使用浏览器的矢量图制图工具，在地图上绘制折线的地图叠加层
-            var polyline = new BMap.Polyline(pointArr, {
+        addPathLineDB09: function(path_info, data){
+            console.log(path_info, data);
+            if(data.status != 0){
+                return;
+            }
+            var points = data.points;
+            var polyline = new BMap.Polyline(points, {
                 strokeColor: "#0C8816",
                 // strokeColor: "blue",
                 strokeWeight: 3,
@@ -151,24 +189,30 @@
 
             // 将覆盖物（线）添加到地图上
             this.map.addOverlay(polyline);
-//            console.log(pointArr)
+            if(path_info.batch=="undifined" || path_info.batch == 0) // 同一条路径仅对第一转换批次进行聚焦
+                this.setZoom(points);  // 聚焦到轨迹
+        },
 
-//            //在每个离散点上添加图标
-//            for (var i = 0, len = pointArr.length; i < len; i++) {
-//
-//                myIcon = new BMap.Icon("/static/autodrive/imgs/normal.png", new BMap.Size(32, 32), {
-//                    // 指定定位位置
-//                    offset: new BMap.Size(10, 32),
-//                });
-//                // console.log(pointArr.path[i]);
-//                var point = new BMap.Point(pointArr[i].lng,pointArr[i].lat)
-//                // var point = new BMap.Point(116.324045, 39.987984);
-//                var marker = new BMap.Marker(point, {
-//                    icon: myIcon
-//                });
-//
-//                this.map.addOverlay(marker);
-//            };
+        addPathLineWGS84: function(path_info, data) {
+            console.log(path_info, data.points);
+            if(data.status != 0){
+                return;
+            }
+            _this = this;
+            var points = data.points;
+            // wgs84 转 BD09
+            // 由于每次只能转换10个坐标点, 分批进行转换
+            var convertor = new BMap.Convertor();
+            var batchs = Math.ceil(points.length / 10.0)
+            for(var k=0; k<batchs; k++){
+                var BMapPointsWGS84 = [];
+                for(var i=10*k; i<10*(k+1)&&i<points.length; i++){
+                    BMapPointsWGS84.push(new BMap.Point(points[i].lng, points[i].lat));
+                }
+                var new_path_info = Object.assign({}, path_info);
+                new_path_info.batch = k;
+                convertor.translate(BMapPointsWGS84, 1, 5, _this.addPathLineDB09.bind(_this, new_path_info));
+            }
         },
 
         //根据经纬极值计算绽放级别

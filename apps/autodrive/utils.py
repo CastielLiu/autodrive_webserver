@@ -1,3 +1,5 @@
+import datetime
+import time
 from functools import partial
 from django.conf import settings
 from django.db.models import Q, F, QuerySet
@@ -7,10 +9,9 @@ import string
 
 # 自定义调试打印函数  def print(self, *args, sep=' ', end='\n', file=None)
 def debug_print(self, *args, sep=' ', end='\n', file=None):
-    print(self, args, sep=sep, end=end, file=file)
-    return
     if settings.DEBUG:
-        print(self, args, sep=sep, end=end, file=file)
+        print(time.time(), end=' ')
+        print(self, *args, sep=sep, end=end, file=file)
 
 
 # 对字典浮点数据进行精度处理
@@ -51,13 +52,13 @@ def randomToken(token_len=10):
     return token
 
 
-# @param auto, 是否为自动退出(一般连接断开时自动退出登录, 用户点击退出按钮为手动)
-def userLogout(database, username, auto=False):
+# @param login_time 登录时间, 如果与数据库中记录的时间不符, 则表明已被新登录覆盖
+def userLogout(database, username, login_time=None):
     try:
         # 使用Q对象筛选用户, 查找username或userid匹配的用户
         db_user = database.objects.get(Q(username=username) | Q(userid=username) & Q(is_active=True))
-        db_user.is_online = False
-        if not auto:
+        if login_time is None or login_time == db_user.login_time.strftime("%Y%m%d%H%M%S%f"):
+            db_user.is_online = False
             db_user.session_key = ""
             db_user.token = None  #
 
@@ -98,11 +99,12 @@ def userLoginCheck(database, user_id, user_name, password, token="", session_key
         result['info'] = ""
         return result
 
-    if session_key:  # session_key 非空, 表明为新会话, 保存并生成token
+    if session_key:  # session_key 非空, 表明为新会话, 保存并生成token, 用于用户登录验证ws
         db_user.session_key = session_key
         db_user.token = randomToken(20)  # 登录验证成功, 生成token并存储在数据库
     else:
         db_user.is_online = True
+        db_user.login_time = datetime.datetime.now()  # 记录登录时间
     db_user.save()  # 只有调用save后才会保存到数据库
 
     result['ok'] = True
@@ -113,6 +115,8 @@ def userLoginCheck(database, user_id, user_name, password, token="", session_key
     result['group'] = db_user.group.name
     result['groupid'] = db_user.group.id
     result['usertype'] = db_user.type
+    result['logintime'] = db_user.login_time.strftime("%Y%m%d%H%M%S%f")
+    print(type(db_user.login_time), db_user.login_time)
 
     if db_user.type == db_user.WebType:
         result['is_super'] = db_user.is_super

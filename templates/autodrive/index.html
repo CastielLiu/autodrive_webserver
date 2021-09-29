@@ -73,7 +73,7 @@
     <!-- 地图盒子 -->
     <div id="baidumap_container" class="map">
         <!-- 百度地图API -->
-        <script type="text/javascript" src="http://api.map.baidu.com/api?v=2.0&ak=NVVLTLnfXVsyPAoBl489wIYiZwrnB0RW&services=true"></script>
+        <script type="text/javascript" src="http://api.map.baidu.com/api?v=3.0&ak=NVVLTLnfXVsyPAoBl489wIYiZwrnB0RW&services=true"></script>
         <script src="/static/autodrive/js/mapcontroller.js"></script>
 
         <!-- 搜索显示框 -->
@@ -101,6 +101,10 @@
             <textarea type="text" id="receive_log" rows="20"></textarea></br></br>
             数据发送:</br>
             <textarea type="text" id="send_log" rows="5"></textarea>
+            发送测试数据:</br>
+            <input type="text" id="ws_test_data" width="100%"></input></br>
+            <button id="wsSendBtn">发送</button>
+
         </div>
     </div><!-- END Content -->
 </div><!-- END Man Container -->

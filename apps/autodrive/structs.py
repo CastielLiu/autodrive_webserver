@@ -61,26 +61,32 @@ class ClientConsumerSet:
     # 添加元素 用户登录成功后添加
     def add(self, item, consumer):
         self._lock.acquire()
+        print("len(self._consumers): ", len(self._consumers))
         if item in self._consumers:  # 用户已在当前服务器登录
-            self._consumers[item].closeConnect('{"type": "rep_force_offline"}')
-        
+            # 发送关闭连接信号
+            self._consumers[item].forceOffline()
+
         self._consumers[item] = consumer  # 存储新的consumer
+        print("len(self._consumers): ", len(self._consumers))
         self._lock.release()
 
     # 删除元素 用户退出登录或被迫退出登录时删除
-    def remove(self, item):
+    def remove(self, item, value=None):
         self._lock.acquire()
         if item in self._consumers:
-            self._consumers.pop(item)
+            if value and value == self._consumers[item]:
+                self._consumers.pop(item)
         self._lock.release()
 
     # 异处登录，强制下线
-    def forceOffline(self, item, login_flag):
+    def forceOffline(self, item, login_time):
         self._lock.acquire()
         consumer = self._consumers.get(item)
         if consumer:
-            if login_flag != consumer.login_flag:  # 登录标志与当前服务器所存储的不同, 即异处登录
-                consumer.closeConnect('{"type": "rep_force_offline", "test": 0}')
+            if login_time != consumer.login_time:  # 登录时间与当前服务器所存储的不同, 即异处登录
+                consumer.forceOffline()
+            else:
+                pass
         self._lock.release()
 
     # 通知web端cars上下线(仅通知在线的组内用户)

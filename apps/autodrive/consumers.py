@@ -16,6 +16,10 @@ g_carConsumers = ClientConsumerSet()
 g_webConsumers = ClientConsumerSet()
 instance_cnt = 0
 
+"""
+Websocket是民主的, 建立连接时需要握手协议,而断开连接时需要通知客户端让对方自己断开, 因此服务端调用close并不能断开连接
+"""
+
 
 # 客户端消费者基类
 class ClientConsumer(WebsocketConsumer):
@@ -30,6 +34,7 @@ class ClientConsumer(WebsocketConsumer):
         self.user_name = None
         self.token = ""
         self.login_ok = False
+        self.login_time = None  # 以字符串形式存储
         self.login_flag = ""  # 登录标志字符串, 用在登录通知消息体中,区分不同的登录
         self.user_type = None
         self.db = None  # 数据库
@@ -61,11 +66,11 @@ class ClientConsumer(WebsocketConsumer):
     # 重载父类方法
     def disconnect(self, close_code):
         self.connected = False
-        self.consumers.remove(self.user_id)
-        self.logout(auto=True)  # 自动退出登录
+        self.login_ok = False
+        self.consumers.remove(self.user_id, self)
+        self.logout()  # 自动退出登录
 
-        debug_print("%s_%s disconnect" % (self.user_type, self.user_name))
-        print("remaind %d %s users." % (self.consumers.size(), self.user_type))
+        debug_print("%s_%s disconnect. remaind %d %s users." % (self.user_type, self.user_name, self.consumers.size(), self.user_type))
 
         try:
             self.on_disconnect(close_code)
@@ -93,11 +98,16 @@ class ClientConsumer(WebsocketConsumer):
         return ok
 
     # 关闭连接, response: 关闭回应
+    # 发送关闭连接信号到客户端,由客户端发起断开请求
     def closeConnect(self, response=None):
         if response:
-            print("closeConnect", response)
+            # print("closeConnect", response)
             self.safetySend(response)
-        self.close()
+        self.safetySend(text_data=json.dumps({"type": "disconnect", "msg": ""}))
+
+    # 强制下线
+    def forceOffline(self):
+        self.safetySend(text_data=json.dumps({"type": "rep_force_offline", "msg": ""}))
 
     # 用户登录, 登录成功后将其加入用户列表
     # @param data_dict: 用户请求登录数据
@@ -125,6 +135,7 @@ class ClientConsumer(WebsocketConsumer):
                 return False
 
             self.login_ok = True
+            self.login_time = login_res['logintime']
             self.user_id = str(login_res['userid'])
             self.user_name = login_res['username']
             self.user_groupname = login_res['group']
@@ -143,17 +154,18 @@ class ClientConsumer(WebsocketConsumer):
         # 以广播形式通知用户上线时, 所有服务器(包括当前服务器)将收到通知, 若通知的用户已在当前服务器登录, 则做下线处理
         # 但当前服务器若收到自己的通知消息, 则不做处理. 否则将导致刚登录的用户被下线
         # 登录标志字符串用于区分是否为自我发送
-        self.login_flag = str(time.time()) + '_' + randomStr(5)
+        # self.login_flag = str(time.time()) + '_' + randomStr(5)
+        debug_print("user login, publish...")
         g_pubsub.publish(userLogioChannel(),
-                         userLogioRedisMsg(self.user_type, self.user_groupid, self.user_id, self.login_flag, True))
+                         userLogioRedisMsg(self.user_type, self.user_groupid, self.user_id, self.login_time, True))
+        debug_print("user login, add to consumers...")
         self.consumers.add(self.user_id, self)
 
         # print("login: ", self.login_ok, data_dict)
         return True
 
     # 注销用户
-    # param auto 是否为自动注销
-    def logout(self, auto=False):
+    def logout(self):
         if self.login_ok:
             if self.user_id in self.consumers:
                 self.consumers.remove(self.user_id)  # 从集合中删除
@@ -161,7 +173,7 @@ class ClientConsumer(WebsocketConsumer):
         else:  # 已经离线, 无需重复执行 (当连接断开时, 将自动调用退出登录)
             return
 
-        userLogout(self.db, self.user_name, auto=auto)
+        userLogout(self.db, self.user_name, login_time=self.login_time)
 
         # 先将login_ok复位, 再关闭连接, 防止循环调用
         self.login_ok = False
@@ -408,23 +420,24 @@ class WebClientConsumer(ClientConsumer):
 
 # 用户上下线通知回调函数
 def userLoginLogoutInfoCallback(item):
-    redis_data = json.loads(item['data'])
-    loginout_data = json.loads(redis_data['body'])
-    islogin = loginout_data['islogin']  # login or logout
-    usertype = loginout_data['usertype']
-    groupid = loginout_data['groupid']
-    userid = loginout_data['userid']
-    login_flag = loginout_data['flag']
+    try:
+        redis_data = json.loads(item['data'])
+        loginout_data = json.loads(redis_data['body'])
+        islogin = loginout_data['islogin']  # login or logout
+        usertype = loginout_data['usertype']
+        groupid = loginout_data['groupid']
+        userid = loginout_data['userid']
+        login_time = loginout_data['logintime']
+    except Exception as e:
+        return
 
     if usertype == ClientConsumer.WEB_USER_TYPE:  # web用户
         if islogin and userid in g_webConsumers:  # web用户上线且在当前服务器处于登录状态
-            g_webConsumers.forceOffline(userid, login_flag)
-
+            g_webConsumers.forceOffline(userid, login_time)
     elif usertype == ClientConsumer.CAR_USER_TYPE:  # car用户
         g_webConsumers.carsLogioAttentionWeb(groupid, userid, islogin)  # car用户上下线提醒
 
-    # print("userLoginLogoutInfoCallback", item['data'])
-    pass
+    debug_print("userLoginLogoutInfoCallback", item['data'])
 
 
 # 以私有通道订阅用户上下线信息

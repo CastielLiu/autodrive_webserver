@@ -35,8 +35,9 @@ class User(models.Model):
     group = models.ForeignKey(UserGroup, on_delete=models.PROTECT, default=default_user_group)
     session_key = models.CharField('会话ID', max_length=40, blank=True, default="")
     token = models.CharField('临时令牌', max_length=50, blank=True, null=True)
+    login_time = models.DateTimeField('登录时间', blank=True, null=True)
     is_online = models.BooleanField('是否在线', default=False)
-    is_active = models.BooleanField('是否活跃', default=True)
+    is_active = models.BooleanField('有效', default=True)
     # 远程端操作车端用户时, 在数据库中对双方均进行加锁处理, 防止冲突
     # 上锁后其操作全部拒绝, 并且拒绝新登录(防止正在操作或被操作的用户被挤掉线)
     op_lock = models.BooleanField('操作锁', default=False)
