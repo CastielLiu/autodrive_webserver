@@ -68,6 +68,15 @@
             </div>
             <p id="msgBoxInfomation"></p>
         </div>
+
+        <div id='state-msgBox' class="msgBox">
+            <h1 align="center">车辆状态</h1>
+            <p>目标车辆: <label id="stateCarId"></label></p>
+            <p>任务状态: <label id="stateCarTask"></label></p>
+            <p>当前车速: <label id="stateCarSpeed"></label></p>
+        </div>
+
+
     </div>
 
     <!-- 地图盒子 -->
@@ -77,7 +86,7 @@
         <script src="/static/autodrive/js/mapcontroller.js"></script>
 
         <!-- 搜索显示框 -->
-        <div id="r-result">
+        <div id="r-result" hidden>
             地址: <input id="cityName" type="text" style="width:100px; margin-right:10px;" />
             <input type="button" value="搜索" onclick="window.mapctrler.locationSearch()" /> 经度:
             <input type="text" id="lng" /> 纬度：

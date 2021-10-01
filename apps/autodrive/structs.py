@@ -61,13 +61,11 @@ class ClientConsumerSet:
     # 添加元素 用户登录成功后添加
     def add(self, item, consumer):
         self._lock.acquire()
-        print("len(self._consumers): ", len(self._consumers))
         if item in self._consumers:  # 用户已在当前服务器登录
             # 发送关闭连接信号
             self._consumers[item].forceOffline()
 
         self._consumers[item] = consumer  # 存储新的consumer
-        print("len(self._consumers): ", len(self._consumers))
         self._lock.release()
 
     # 删除元素 用户退出登录或被迫退出登录时删除

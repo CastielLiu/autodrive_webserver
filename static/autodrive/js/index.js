@@ -49,6 +49,11 @@
                 requestPathTraj(parseInt(pathid));
             });
 
+            $(document).on('change', '#pathList', function(e){
+                var pathid = $("#pathList option:selected").val();
+                requestPathTraj(parseInt(pathid));
+            });
+
             $(document).on('click', '#connectBtn', function(e){
                 if(_this.core_ws_login)
                     _this.core_ws.close();
@@ -84,7 +89,7 @@
                requestOnlineCars("测试组"); //http
             });
 
-            // 显示所有车辆位置  $(document)可以绑定动态页面事件
+            // 显示所有车辆位置  $(document)可以绑定动态页面事件, $(obj).click(fun) 只处理已有的页面
             $(document).on('click', '#showAllCarsPos', function(){
                 var flag = $("#showAllCarsPos").prop("checked");
                 $(".showCarPos").each(function () {
@@ -121,10 +126,16 @@
                 $('#taskCarId').val($(this).html());
                 $("#msgBoxInfomation").html("");
                 requestPathList(_this.user_groupid); //请求路径列表
+
+                $('#state-msgBox').css('display', 'block');
+                $('#stateCarId').html($(this).html());
+                $('#stateCarTask').html("获取中...");
+                $('#stateCarSpeed').html("获取中...");
             });
             //关闭消息对话框
             $(document).on('click', '#closeMsgBox', function(){
                 $('#task-msgBox').css('display', 'none');
+                $('#state-msgBox').css('display', 'none');
             });
             //终止车辆当前任务
             $(document).on('click', '#stopCurrentTask', function(){
@@ -272,8 +283,10 @@
                   // 状态数据
                   // info.id
                   // info.car_state
-
+                  // 根据车辆id进行显示
                   $('#taskCarState').val(data.status);  //自动驾驶任务状态
+
+
                 }
                 else if(type == "res_car_list"){
     //                console.log(msg.cars)

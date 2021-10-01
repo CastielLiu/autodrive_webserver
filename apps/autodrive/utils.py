@@ -8,6 +8,9 @@ import string
 
 
 # 自定义调试打印函数  def print(self, *args, sep=' ', end='\n', file=None)
+from apps.autodrive.models import CarUser
+
+
 def debug_print(self, *args, sep=' ', end='\n', file=None):
     if settings.DEBUG:
         print(time.time(), end=' ')
@@ -105,6 +108,8 @@ def userLoginCheck(database, user_id, user_name, password, token="", session_key
     else:
         db_user.is_online = True
         db_user.login_time = datetime.datetime.now()  # 记录登录时间
+        result['logintime'] = db_user.login_time.strftime("%Y%m%d%H%M%S%f")
+        debug_print("%s logged in in %s" % (db_user.username, db_user.login_time))
     db_user.save()  # 只有调用save后才会保存到数据库
 
     result['ok'] = True
@@ -115,8 +120,6 @@ def userLoginCheck(database, user_id, user_name, password, token="", session_key
     result['group'] = db_user.group.name
     result['groupid'] = db_user.group.id
     result['usertype'] = db_user.type
-    result['logintime'] = db_user.login_time.strftime("%Y%m%d%H%M%S%f")
-    print(type(db_user.login_time), db_user.login_time)
 
     if db_user.type == db_user.WebType:
         result['is_super'] = db_user.is_super
@@ -134,6 +137,20 @@ def queryValuesListByUserId(db, userid, *args):
     except Exception as e:
         print(e)
         return None
+
+
+# @brief 查询组内所有车辆
+# @param groupid 用户组
+# @return ["carid", ...]
+def queryCarsInGroup(groupid):
+    try:
+        res = []
+        cars = CarUser.objects.filter(group__id=groupid)
+        for car in cars:
+            res.append(car.userid)
+        return res
+    except Exception as e:
+        return []
 
 
 # @brief 将http请求转发经websocket转发到车端
@@ -160,7 +177,3 @@ def transmitFromHttpToWebsocket(clients, car_id, content, sync=True):
         return False, "Request timeout in server"
     request_task.cv.release()
     return True, response_text
-
-
-
-

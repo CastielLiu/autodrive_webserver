@@ -45,19 +45,29 @@ class PubSub:
             self.pubsub.run_in_thread(1.0)
             self.pubsub_thread_started = True
 
-    def unsubscribe(self, channel, private_ps=None):
+    # @brief 取消订阅
+    # @param channel 取消订阅的通道
+    # @param private_ps 所在的私有pubsub(默认为None, self.pubsub)
+    # @param _all 是否取消所有订阅
+    def unsubscribe(self, channel, private_ps=None, _all=False):
         if private_ps:
             if private_ps not in self.pubsub_array:
                 return
 
             pubsub = self.pubsub_array[private_ps]
-            pubsub.unsubscribe(channel)
+            if _all:
+                pubsub.close()
+            else:
+                pubsub.unsubscribe(channel)
 
             # 由于subscribed函数被property装饰,因此访问时不能加()
             if not pubsub.subscribed:  # 无监听通道, 删除监听器pubsub
                 self.pubsub_array.pop(private_ps)
         else:
-            self.pubsub.unsubscribe(channel)
+            if _all:
+                self.pubsub.close()
+            else:
+                self.pubsub.unsubscribe(channel)
 
     # 订阅一个或多个给定模式的通道
     # @param private_ps 私有ps名称, 当非None时创建新的self.client.pubsub()
