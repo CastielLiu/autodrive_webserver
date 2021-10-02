@@ -242,6 +242,8 @@ class CarClientsConsumer(ClientConsumer):
         self.sync_req_cv = threading.Condition()  # 同步请求条件变量
         self.sync_req_response = ""  # 同步请求应答结果
 
+        self.cmd_ps = None  # 控制指令私有订阅器, 使用私有订阅器,防止主订阅关闭导致无法订阅
+
     def on_disconnect(self, close_code):
         pass
 
@@ -255,6 +257,8 @@ class CarClientsConsumer(ClientConsumer):
             self.state.steer_angle = msg.get("steer_angle", None)
             self.state.longitude = msg.get("lng", None)
             self.state.latitude = msg.get("lat", None)
+            self.state.soc = msg.get("soc", -1)
+            self.state.gear = msg.get("soc", 'unknown')
 
             self.state.mode.set(msg.get("mode", None))
             self.state.status.set(msg.get("status", 'unknown'))
@@ -294,7 +298,13 @@ class CarClientsConsumer(ClientConsumer):
 
     # 接收经redis转发的车辆控制请求指令
     def redisCarCmdCallback(self, item: dict):
-        data_dict = json.loads(item['data'])
+        print("redisCarCmdCallback", item)
+        try:
+            data_dict = json.loads(item['data'])
+        except json.decoder.JSONDecodeError as e:
+            debug_print("redis car cmd: %s is not json format!" % item['data'])
+            return
+
         sync_channel = data_dict.get('sync')  # 请求的同步响应通道(指令发送者期望通过该通道获取响应)
         error_msg = None
 
@@ -306,8 +316,6 @@ class CarClientsConsumer(ClientConsumer):
 
         if sync_channel is None:  # 无需同步响应
             return
-
-        print("redisCarCmdCallback", data_dict)
 
         self.sync_req_cv.acquire()
         if not send_ok:
@@ -327,12 +335,15 @@ class CarClientsConsumer(ClientConsumer):
         # car用户登录成功后, 添加redis订阅
         self.car_cmd_channel = carCmdChannel(self.user_groupid, self.user_id)
         self.car_state_channel = carStateChannel(self.user_groupid, self.user_id)
+        self.cmd_ps = self.user_id + "CmdPS"
 
         # 订阅针对当前car用户的通道(唯一订阅者->唯一回调函数)
-        g_pubsub.subscribe(self.car_cmd_channel, self.redisCarCmdCallback)
+        g_pubsub.subscribe(self.car_cmd_channel, self.redisCarCmdCallback, private_ps=self.cmd_ps)
+        debug_print("car sub %s" % self.car_cmd_channel)
 
     def on_logout(self):
-        g_pubsub.unsubscribe(self.car_cmd_channel)
+        g_pubsub.unsubscribe(self.car_cmd_channel, private_ps=self.cmd_ps)
+        debug_print("car unsub %s" % self.car_cmd_channel)
         pass
 
 
@@ -347,19 +358,12 @@ class WebClientConsumer(ClientConsumer):
         self.consumers = g_webConsumers
         # 需要监听的客户列表, 根据客户端请求进行配置
         self.sub_cars_list = {}  # {'carid': True/False}
+        self.car_state_ps = None  # 私有的redis订阅器, 订阅车辆状态时,使用私有pubsub便于管理
 
     # 数据报告线程, 将车辆数据按照一定频率转发到web客户端
     def debugReportThread(self):
         report = {"type": "rep_car_state", "data": {}}
         while self.thread_run_flag:
-            # try:
-            #     for car_id, car_attrs in self.listen_cars.items():
-            #         if car_id not in xx:
-            #             continue
-            #         report['data'] = xx[car_id].reltimedata(car_attrs)
-            #         self.safetySend(json.dumps(report))
-            # except Exception as e:
-            #     print("debugReportThread error", e)
             time.sleep(0.1)
 
     def on_disconnect(self, close_code):
@@ -368,6 +372,10 @@ class WebClientConsumer(ClientConsumer):
         # 仅当请求注销时进行注销
         # self.logout()
 
+        # 取消所有redis订阅
+        g_pubsub.unsubscribe(channel="", private_ps=self.car_state_ps, _all=True)
+        g_pubsub.unsubscribe(channel="", _all=True)
+
     # 重载父类方法
     def on_received(self, text_data, bytes_data):
         msg_type, data = self.preprocesse(text_data)
@@ -375,27 +383,26 @@ class WebClientConsumer(ClientConsumer):
             return
         response = {"type": msg_type.replace("req", "res"), "msg": "", "code": 0, "data": {}}
         response_text = None
-
+        print("ws_request: ", text_data)
         if msg_type == "req_sub_car_state":
             action = data.get("action", "")
             cars_id = data.get("cars_id", [])
             if action == "ADD":  # 新增
                 for carid in cars_id:
                     if carid == "*":  # 添加所有
-                        cars = queryCarsInGroup(self.user_groupid)
-                        for car in cars:
-                            self.sub_cars_list[carid] = True
+                        _cars_id = queryCarsInGroup(self.user_groupid)
+                        for car_id in _cars_id:
+                            self.sub_cars_list[car_id] = True
                         break
                     else:
                         self.sub_cars_list[carid] = True
             elif action == "DELETE":  # 删除
                 for carid in cars_id:
-                    if carid in self.sub_cars_list:
-                        if carid == "*":  # 删除所有
-                            self.sub_cars_list.clear()
-                            break
-                        else:
-                            self.sub_cars_list.pop(carid)
+                    if carid == "*":  # 删除所有
+                        self.sub_cars_list.clear()
+                        break
+                    elif carid in self.sub_cars_list:
+                        self.sub_cars_list.pop(carid)
             elif action == "REPLACE":  # 替换列表
                 self.sub_cars_list.clear()
                 for carid in cars_id:
@@ -404,19 +411,20 @@ class WebClientConsumer(ClientConsumer):
                 response['code'] = 1
                 response['msg'] = "request action %s is invalid!" % action
 
-            # 使用私有pubsub便于管理
-            private_ps = self.user_id + "carState_ps"
-            # 先取消所有订阅
-            g_pubsub.unsubscribe(channel="", private_ps=private_ps, _all=True)
-            # 再添加到redis订阅
-            for carid in self.sub_cars_list:
-                g_pubsub.subscribe(carStateChannel(self.user_groupid, carid),
-                                   self.redisCarStateCallback, private_ps=private_ps)
+            if response['code'] == 0:
 
-            response['data'] = {"cars_id": self.sub_cars_list.keys()}
+                # 先取消所有订阅
+                g_pubsub.unsubscribe(channel="", private_ps=self.car_state_ps, _all=True)
+                # 再添加到redis订阅
+                for carid in self.sub_cars_list:
+                    g_pubsub.subscribe(carStateChannel(self.user_groupid, carid),
+                                       self.redisCarStateCallback, private_ps=self.car_state_ps)
+
+                response['data'] = {"cars_id": list(self.sub_cars_list.keys())}
         else:
             self.safetySend("Unknown request type!")
 
+        print("ws_response:", response)
         if response_text is not None:
             self.safetySend(response_text)
         else:
@@ -428,6 +436,7 @@ class WebClientConsumer(ClientConsumer):
         data_dict = json.loads(item['data'])
 
         body = data_dict.get('body')
+
         # 转发数据转发到web客户端
         if isinstance(body, dict):
             send_ok = self.safetySend(text_data=json.dumps(body))
@@ -435,13 +444,18 @@ class WebClientConsumer(ClientConsumer):
             send_ok = self.safetySend(text_data=data_dict.get('body'))
 
     def on_login(self):
+        self.car_state_ps = self.user_id + "CarState_ps"
+
         # 启动数据自动上报线程
         self.report_thread = threading.Thread(target=self.debugReportThread)
         self.report_thread.start()
 
         # 订阅组内car用户所有状态信息
-        g_pubsub.psubscribe(carStateChannelPrefix(self.user_groupid) + '*', self.redisCarStateCallback,
-                            private_ps=self.user_id)
+        # g_pubsub.psubscribe(carStateChannelPrefix(self.user_groupid) + '*', self.redisCarStateCallback,
+        #                     private_ps=self.user_id)
+
+        # 是否需要将用户的当前操作记录到数据库, 并设置失效时间, 再次连接时将其载入并进行对应的操作
+        # 防止用户掉线重连后部分操作失效,例如订阅列表(默认情况下订阅列表为空,若用户已经订阅了部分车辆,期间掉线重连,导致不再订阅!)
 
     def on_logout(self):
         g_pubsub.punsubscribe(carStateChannelPrefix(self.user_groupid) + '*', self.user_id)
@@ -469,5 +483,18 @@ def userLoginLogoutInfoCallback(item):
     # debug_print("userLoginLogoutInfoCallback", item['data'])
 
 
+def developDebugThread():
+    car_state = {"mode": "Debug", "soc": 15, "speed": 0.0, "gear": 'N', "status": "Debug"}
+    rep_car_state = {"type": "rep_car_state", "data": car_state}
+    i = 0
+    while True:
+        g_pubsub.publish(channel="develop_car_state_testcar3", msg=rep_car_state, publisher="debug")
+        car_state['speed'] = i % 15 + 0.5
+        car_state['soc'] = i % 100
+        i += 1
+        time.sleep(0.5)
+
+
 # 以私有通道订阅用户上下线信息
 g_pubsub.subscribe(userLogioChannel(), userLoginLogoutInfoCallback, private_ps="user_logio_note")
+threading.Thread(target=developDebugThread, daemon=True).start()

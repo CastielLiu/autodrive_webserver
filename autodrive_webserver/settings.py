@@ -22,7 +22,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = '*7*lu8sw4yoy9nd&w_*f_#)ws#_tqeqda8y5w!n0e5!ya-c76f'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 # 当使用runserver时需要跟上0.0.0.0:port参数 这是客户端访问的第一道屏障通过之后才检测ALLOWED_HOSTS
 # 允许被访问的地址, '*'允许所有

@@ -30,7 +30,7 @@ div#baidumap_container{
 /* 调试信息栏 */
 div#other_container{
     padding: 5px;
-    width: 100px;
+    width: 250px;
     background-color: #ffffff;
     text-align: left;
 }

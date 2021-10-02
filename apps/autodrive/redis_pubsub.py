@@ -18,32 +18,35 @@ class PubSub:
                                          db=settings.REDIS['DB'], password=settings.REDIS['PASSWORD'])
         self.client = redis.StrictRedis(connection_pool=self.pool)
         self.pubsub = self.client.pubsub()
+        # print("+++++++++++++++++++++++", self.pool)
+        # print("+++++++++++++++++++++++", self.client)
+        # print("+++++++++++++++++++++++", self.pubsub)
+
         self.pubsub.ping()  # 创建连接
-        self.pubsub_thread_started = False
+        self.pubsub_thread = None
 
         self.sync_cv = threading.Condition()
         self.sync_msg = ""
 
-        self.pubsub_array = dict()  # 存放新建的私有pubsub
+        self.pubsub_array = dict()  # 存放新建的私有pubsub以及工作线程[pubsub, thread]
 
     # 添加订阅的通道
     def subscribe(self, channel, callback, private_ps=None):
         if private_ps:
             # print("subscribe private_ps: %s" % private_ps)
             if private_ps in self.pubsub_array:  # 已存在则取出
-                pubsub = self.pubsub_array[private_ps]
+                pubsub = self.pubsub_array[private_ps][0]
                 pubsub.subscribe(**{channel: callback})
             else:  # 不存在则创建
                 pubsub = self.client.pubsub()
-                self.pubsub_array[private_ps] = pubsub
                 pubsub.subscribe(**{channel: callback})
-                pubsub.run_in_thread(10.0)  # 启动监听线程
+                t = pubsub.run_in_thread(10.0)  # 启动监听线程
+                self.pubsub_array[private_ps] = [pubsub, t]
             return
 
         self.pubsub.subscribe(**{channel: callback})
-        if not self.pubsub_thread_started:
-            self.pubsub.run_in_thread(1.0)
-            self.pubsub_thread_started = True
+        if self.pubsub_thread is None:
+            self.pubsub_thread = self.pubsub.run_in_thread(1.0, daemon=True)
 
     # @brief 取消订阅
     # @param channel 取消订阅的通道
@@ -54,20 +57,29 @@ class PubSub:
             if private_ps not in self.pubsub_array:
                 return
 
-            pubsub = self.pubsub_array[private_ps]
+            pubsub, t = self.pubsub_array[private_ps]
             if _all:
+                t.stop()  # 停止工作线程
+                t.join()  # 等待线程退出
                 pubsub.close()
             else:
                 pubsub.unsubscribe(channel)
 
             # 由于subscribed函数被property装饰,因此访问时不能加()
             if not pubsub.subscribed:  # 无监听通道, 删除监听器pubsub
+                t.stop()  # 停止工作线程
+                t.join()  # 等待线程退出
                 self.pubsub_array.pop(private_ps)
         else:
             if _all:
+                self.pubsub_thread.stop()
+                self.pubsub_thread.join()
                 self.pubsub.close()
             else:
                 self.pubsub.unsubscribe(channel)
+                if not self.pubsub.subscribed:
+                    self.pubsub_thread.stop()  # 停止工作线程
+                    self.pubsub_thread.join()  # 等待线程退出
 
     # 订阅一个或多个给定模式的通道
     # @param private_ps 私有ps名称, 当非None时创建新的self.client.pubsub()
@@ -77,19 +89,18 @@ class PubSub:
         if private_ps:
             # print("psubscribe private_ps: %s" % private_ps)
             if private_ps in self.pubsub_array:  # 已存在则取出
-                pubsub = self.pubsub_array[private_ps]
+                pubsub = self.pubsub_array[private_ps][0]
                 pubsub.psubscribe(**{channel: callback})
             else:  # 不存在则创建
                 pubsub = self.client.pubsub()
-                self.pubsub_array[private_ps] = pubsub
                 pubsub.psubscribe(**{channel: callback})
-                pubsub.run_in_thread(10.0)  # 启动监听线程
+                t = pubsub.run_in_thread(10.0)  # 启动监听线程
+                self.pubsub_array[private_ps] = [pubsub, t]
             return
 
         self.pubsub.psubscribe(**{channel: callback})
-        if not self.pubsub_thread_started:
-            self.pubsub.run_in_thread(1.0)
-            self.pubsub_thread_started = True
+        if self.pubsub_thread is None:
+            self.pubsub_thread = self.pubsub.run_in_thread(1.0, daemon=True)
 
     def punsubscribe(self, channel, private_ps=None):
         # print("%s in self.pubsub_array?" % private_ps, private_ps in self.pubsub_array)
@@ -97,15 +108,20 @@ class PubSub:
             if private_ps not in self.pubsub_array:
                 return
 
-            pubsub = self.pubsub_array[private_ps]
+            pubsub, t = self.pubsub_array[private_ps]
             pubsub.punsubscribe(channel)
 
             # 由于subscribed函数被property装饰,因此访问时不能加()
             if not pubsub.subscribed:  # 无监听通道, 删除监听器pubsub
-                self.pubsub_array.pop(private_ps)
+                t.stop()  # 关闭监听线程
+                t.join()
+                self.pubsub_array.pop(private_ps)  # 从库中删除
             return
 
         self.pubsub.punsubscribe(channel)
+        if not self.pubsub.subscribed:
+            self.pubsub_thread.stop()  # 停止工作线程
+            self.pubsub_thread.join()  # 等待线程退出
 
     # channel 发布通道
     # msg 发布消息 str/dict

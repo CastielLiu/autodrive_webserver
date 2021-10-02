@@ -80,9 +80,8 @@
                 }
             });
             $(document).on('click', '#wsSendBtn', function(e){
-                var msg = JSON.stringify({"type": "test", "data": {"ping": $('#ws_test_data').val()}});
-                console.log(msg);
-               _this.core_ws.send(msg);
+                console.log($('#ws_test_data').val());
+               _this.core_ws.send($('#ws_test_data').val());
             });
 
             $(document).on('click', '#flush_online_cars', function(e){
@@ -121,21 +120,25 @@
             });
             //车辆ID点击事件
             $(document).on('click', '.doTask', function(){
-//                console.log($(this).html());
+                var car_id = $(this).html();
                 $('#task-msgBox').css('display', 'block');
-                $('#taskCarId').val($(this).html());
+                $('#taskCarId').val(car_id);
                 $("#msgBoxInfomation").html("");
                 requestPathList(_this.user_groupid); //请求路径列表
 
                 $('#state-msgBox').css('display', 'block');
-                $('#stateCarId').html($(this).html());
+                $('#stateCarId').html(car_id);
                 $('#stateCarTask').html("获取中...");
                 $('#stateCarSpeed').html("获取中...");
+                _this.requestSubCarsState("ADD", [car_id])
             });
             //关闭消息对话框
             $(document).on('click', '#closeMsgBox', function(){
+                var carid = $('#stateCarId').html();
+
                 $('#task-msgBox').css('display', 'none');
                 $('#state-msgBox').css('display', 'none');
+                _this.requestSubCarsState("DELETE", ['*'])
             });
             //终止车辆当前任务
             $(document).on('click', '#stopCurrentTask', function(){
@@ -255,6 +258,7 @@
                     if(typeof(type) == "undefined")
                         return;
                 }catch(err){
+                    console.log("parse core_ws data faild " + err)
                     return;
                 }
 
@@ -280,11 +284,16 @@
                     location.reload();
                 }
                 else if(type == "rep_car_state"){
-                  // 状态数据
-                  // info.id
-                  // info.car_state
-                  // 根据车辆id进行显示
-                  $('#taskCarState').val(data.status);  //自动驾驶任务状态
+                    // 状态数据
+                    // info.id
+                    // info.car_state
+                    // 根据车辆id进行显示
+                    $('#taskCarState').val(data.status);  //自动驾驶任务状态
+
+                    $('#stateCarTask').html(data.status);
+                    $('#stateCarSpeed').html(data.speed+"km/h");
+                    $('#stateCarGear').html(data.gear);
+                    $('#stateCarSoc').html(data.soc+"%");
 
 
                 }
@@ -306,8 +315,14 @@
                 if(_this.core_ws_initiative_close == 0){
                     console.log("core_ws close, try to reconnect");
                     _this.connect_core_ws();
+                    // 重新连接? 刷新页面?
+                    // 如果仅进行重新连接, 页面之前的操作指令可能已经被服务器删除
                 }
             };
+        },
+        requestSubCarsState: function(action, carsid){
+            var cmd = {"type": "req_sub_car_state", "data": {"action": action, "cars_id": carsid}};
+            this.core_ws.send(JSON.stringify(cmd));
         },
     };
 

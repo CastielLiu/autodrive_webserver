@@ -10,6 +10,7 @@ class CarState:  # 车辆状态
         self.speed = None
         self.steer_angle = None
         self.gear = None
+        self.soc = None
         self.longitude = None
         self.latitude = None
         self.x = None
@@ -22,13 +23,8 @@ class CarState:  # 车辆状态
 
     # 获取车辆状态数据字典
     def data(self):
-        d = dict()
-        d['speed'] = self.speed
-        d['steer_angle'] = self.steer_angle
-        d['gear'] = self.gear
-        d['mode'] = self.mode
-        d['longitude'] = self.longitude
-        d['latitude'] = self.latitude
+        d = {'speed': self.speed, 'angle': self.steer_angle, 'gear': self.gear, 'mode': self.mode,
+             'lng': self.longitude, 'lat': self.latitude, 'soc': self.soc}
         return d
 
     def __str__(self):
