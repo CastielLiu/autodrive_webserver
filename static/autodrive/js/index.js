@@ -69,18 +69,18 @@
                 ws = new WebSocket('ws://' + window.location.host + '/ws/autodrive/test/');
                 ws.onopen = function(){
                     data = {"message": "test message"};
-                    console.log(data);
+                    tools.console_log(data);
                     ws.send(JSON.stringify(data));
                 }
 
                 ws.onmessage = function(msg){
-                    console.log("msg");
+                    tools.console_log("msg");
                 }
                 ws.onclose = function(){
                 }
             });
             $(document).on('click', '#wsSendBtn', function(e){
-                console.log($('#ws_test_data').val());
+                tools.console_log($('#ws_test_data').val());
                _this.core_ws.send($('#ws_test_data').val());
             });
 
@@ -116,7 +116,7 @@
                 if($(".showCarPos:checked").length > 0){
                     _this.update_cars_clock = setInterval(requestCarsPosition, 1000);
                 }
-                console.log($(this).name);
+                tools.console_log($(this).name);
             });
             //车辆ID点击事件
             $(document).on('click', '.doTask', function(){
@@ -160,12 +160,12 @@
                     timeout: 10000, //10s
                     async: true,  //async 为false时表示同步, 将导致html页面不更新
                     done: function(data){
-                        console.log(data);
+                        tools.console_log(data);
                         dict = JSON.parse(data);
                         type = dict.type;
                         code = dict.code;
                         msg = dict.msg;
-                        console.log(data);
+                        tools.console_log(data);
                         if(code === 0){
                             msgTextObj.html("任务启动成功！");//;
                         }
@@ -238,7 +238,7 @@
                     loginInfo.innerHTML = "用户名或token不存在, 请勿禁用cookie";
                     // location.reload(); //重新加载页面已获得cookie
 
-                    console.log("用户名或token不存在, 请勿禁用cookie");
+                    tools.console_log("用户名或token不存在, 请勿禁用cookie");
                     return;
                 }
                 data = JSON.stringify({"type": "req_login", "data": {"userid": userid, "token": token}});
@@ -258,7 +258,7 @@
                     if(typeof(type) == "undefined")
                         return;
                 }catch(err){
-                    console.log("parse core_ws data faild " + err)
+                    tools.console_log("parse core_ws data faild " + err)
                     return;
                 }
 
@@ -273,7 +273,7 @@
                     }else{
                         loginInfo.innerHTML = "帐号或密码/token错误";
                         location.reload(); //登录帐号以及token均是从cookie获取, 正常不会出错, 如验证失败, 刷新页面以重新获取cookie
-                        console.log("帐号或密码/token错误");
+                        tools.console_log("帐号或密码/token错误");
                     }
                 }
                 else if(type == "rep_force_offline"){
@@ -294,11 +294,18 @@
                     $('#stateCarSpeed').html(data.speed+"km/h");
                     $('#stateCarGear').html(data.gear);
                     $('#stateCarSoc').html(data.soc+"%");
+                    var base_ready, mode;
+                    if(data.base_ready) base_ready = "是";
+                    else base_ready = "否"
+                    $('#stateBaseReady').html(base_ready);
 
-
+                    if(data.driverless) mode = "自动驾驶";
+                    else    mode = "人工驾驶";
+                    $('#stateCurrentMode').html(mode);
+                    tools.console_log(data);
                 }
                 else if(type == "res_car_list"){
-    //                console.log(msg.cars)
+    //                tools.console_log(msg.cars)
                     showOnlineCars(msg.cars)
                 }
             };
@@ -313,7 +320,7 @@
                 // 如果非主动关闭(网络错误等),则尝试再次登录
                 // 若不进行重连, 实时信息将无法接收
                 if(_this.core_ws_initiative_close == 0){
-                    console.log("core_ws close, try to reconnect");
+                    tools.console_log("core_ws close, try to reconnect");
                     _this.connect_core_ws();
                     // 重新连接? 刷新页面?
                     // 如果仅进行重新连接, 页面之前的操作指令可能已经被服务器删除
@@ -337,7 +344,7 @@ function showOnlineCars(cars){
         return b.online - a.online;
     });
 
-    console.log(cars);
+    tools.console_log(cars);
     var tab="<table border='1'>";
     tab+="<tr><th>车辆ID</th><th>车辆名称</th><th>" +"<input type='checkbox' " + "id='showAllCarsPos'>显示位置"+"</th>"
         +"<th>是否在线</th>"+"<th>分组</th>"

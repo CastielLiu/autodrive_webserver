@@ -16,14 +16,14 @@ class CarState:  # 车辆状态
         self.x = None
         self.y = None
         self.status = ChangeDataMonitor()
-        self.mode = ChangeDataMonitor()
+        self.driverless = ChangeDataMonitor()
 
     def changed(self):
-        return self.status.changed() or self.mode.changed()
+        return self.status.changed() or self.driverless.changed()
 
     # 获取车辆状态数据字典
     def data(self):
-        d = {'speed': self.speed, 'angle': self.steer_angle, 'gear': self.gear, 'mode': self.mode,
+        d = {'speed': self.speed, 'angle': self.steer_angle, 'gear': self.gear, 'driverless': self.driverless,
              'lng': self.longitude, 'lat': self.latitude, 'soc': self.soc}
         return d
 

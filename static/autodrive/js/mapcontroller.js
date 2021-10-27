@@ -88,7 +88,7 @@
             });
         },
 
-        getPath: function getPath() {
+        getPath: function() {
             $.ajax({
                 url: "/nav_path",
                 timeout: 10000, //超时时间设置为10秒；
@@ -96,7 +96,7 @@
                 success: function(data) {
                     var pointArr = data;
                     addLine(pointArr);
-                    // setZoom(pointArr);
+                    // setZoom({points: pointArr});
                 },
                 error: function(xhr, type, errorThrown) {
 
@@ -104,15 +104,29 @@
             });
         },
 
+        removeOverlay: function(id, only_one=true){
+            var allOverlays = map.getOverlays();
+            for (var i = 0; i < allOverlays.length; i++){
+                if(allOverlays[i].id == id){
+                    this.map.removeOverlay(allOverlays[i]);
+                    if(only_one){
+                        return;
+                    }
+                }
+            }
+        },
+
         // 利用BD09坐标 创建图标对象
         addCarsMarkerBD09: function(cars_pos, data){
             if(data.status != 0){
                 return;
             }
+
             var points = data.points;
-            var point, marker;
+            var car_id, point, marker;
             // 创建标注对象并添加到地图
             for (var i = 0, len = points.length; i < len; i++) {
+                car_id = cars_pos[i].car_id;
                 point = points[i];
 //                console.log(point);
                 // 判断正常或者故障，根据不同装填显示不同Icon
@@ -126,20 +140,20 @@
                 var marker = new BMap.Marker(point, {
                     icon: myIcon
                 });
+                marker.id = car_id;
+
+                this.removeOverlay(marker.id);
+                //创建marker点的标记,这里注意下,因为百度地图可以对label样式做编辑,
+                var label = new BMap.Label(marker.id, {offset: new BMap.Size(20, 0)});
+                //label.setStyle({display: "none"}); //对label样式隐藏
+                marker.setLabel(label); //把label设置到maker上
                 // 将覆盖物添加到地图上
                 this.map.addOverlay(marker);
+                // this.map.centerAndZoom(point, 17);
 
-//                var allOverlay = map.getOverlays();
-//                for (var i = 0; i < allOverlay.length -1; i++){
-//                    if(allOverlay[i].getLabel().content == "我是id=1"){
-//                        map.removeOverlay(allOverlay[i]);
-//                        return false;
-//                    }
-//                }
-
-                this.map.centerAndZoom(point, 17);
-
-                var sContent = "车辆ID:" + cars_pos[i].car_id + "<br>速度: 0.0km/h";
+                // 添加信息弹窗
+                // marker.openInfoWindow(new BMap.InfoWindow(car_id, {width: 50, height: 25}));
+                var sContent = "车辆ID:" + car_id + "<br>速度: 0.0km/h";
                 var opts = {
                     width: 120, // 信息窗口宽度
                     height: 125, // 信息窗口高度
@@ -149,7 +163,6 @@
                 }
                 // 创建信息窗口对象
                 var infoWindow = new BMap.InfoWindow(sContent, opts);
-    //            thisMaker.openInfoWindow(infoWindow); //开启信息窗口
                 // 添加点击事件
                 marker.addEventListener("click", function() {
                     marker.openInfoWindow(infoWindow); //开启信息窗口
@@ -168,11 +181,7 @@
             convertor.translate(points, 1, 5, _this.addCarsMarkerBD09.bind(_this, cars_pos));
         },
 
-        // 弹窗增加点击事件
-//        function func(data) {
-//            alert("点击了机器编号为：" + data + "\n");
-//        }
-
+        path_points : [], // 存储即将需要聚焦的路径点集
         addPathLineDB09: function(path_info, data){
             console.log(path_info, data);
             if(data.status != 0){
@@ -187,10 +196,21 @@
                 strokeOpacity: 1
             });
 
-            // 将覆盖物（线）添加到地图上
+            polyline.id = "path";
+
+            if(path_info.batch == 1){
+                //mapctrler.removeOverlay(polyline.id, false); //移除所有历史绘制的轨迹
+                mapctrler.path_points = points;
+            }
+            else if(path_info.batch == path_info.total_bacths){
+                mapctrler.path_points = mapctrler.path_points.concat(points);
+                mapctrler.setZoom({points: mapctrler.path_points});
+            }
+            else
+                mapctrler.path_points = mapctrler.path_points.concat(points);
+
+             // 将覆盖物（线）添加到地图上
             this.map.addOverlay(polyline);
-            if(path_info.batch=="undifined" || path_info.batch == 0) // 同一条路径仅对第一转换批次进行聚焦
-                this.setZoom(points);  // 聚焦到轨迹
         },
 
         addPathLineWGS84: function(path_info, data) {
@@ -200,19 +220,31 @@
             }
             _this = this;
             var points = data.points;
+            if(points.length == 0)
+                return;
+
             // wgs84 转 BD09
             // 由于每次只能转换10个坐标点, 分批进行转换
             var convertor = new BMap.Convertor();
             var batchs = Math.ceil(points.length / 10.0)
+            var middle_point = new BMap.Point(0, 0); //中间点,用于定位聚焦
+
+            this.removeOverlay("path", false); //移除所有历史绘制的轨迹
             for(var k=0; k<batchs; k++){
                 var BMapPointsWGS84 = [];
                 for(var i=10*k; i<10*(k+1)&&i<points.length; i++){
                     BMapPointsWGS84.push(new BMap.Point(points[i].lng, points[i].lat));
+                    middle_point.lat += points[i].lat /= points.length;
+                    middle_point.lng += points[i].lng /= points.length;
                 }
                 var new_path_info = Object.assign({}, path_info);
-                new_path_info.batch = k;
+                new_path_info.batch = k+1;
+                new_path_info.total_bacths = batchs;
                 convertor.translate(BMapPointsWGS84, 1, 5, _this.addPathLineDB09.bind(_this, new_path_info));
             }
+
+            //tools.console_log(middle_point);
+            //convertor.translate([middle_point], 1, 5, _this.setZoom);
         },
 
         //根据经纬极值计算绽放级别
@@ -234,8 +266,11 @@
             }
         },
 
-        // 判断最大和最小经纬度
-        setZoom: function(points) {
+        // 判断最大和最小经纬度, 然后进行聚焦显示
+        setZoom: function(data) {
+            tools.console_log("setZoom");
+            tools.console_log(data);
+            var points = data.points;
             if (points.length > 0) {
                 var maxLng = points[0].lng;
                 var minLng = points[0].lng;
@@ -251,7 +286,7 @@
                 }
                 var cenLng = (parseFloat(maxLng) + parseFloat(minLng)) / 2;
                 var cenLat = (parseFloat(maxLat) + parseFloat(minLat)) / 2;
-                var zoom = this.getZoom(maxLng, minLng, maxLat, minLat);
+                var zoom = mapctrler.getZoom(maxLng, minLng, maxLat, minLat);
                 this.map.centerAndZoom(new BMap.Point(cenLng, cenLat), zoom);
             } else {
                 this.map.centerAndZoom(new BMap.Point(116.316967, 39.990748), 15);

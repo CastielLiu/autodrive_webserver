@@ -279,11 +279,17 @@ def main_page(request):
             response['msg'] = "Car offline"
         else:
             channel = carCmdChannel(usergroupid, car_id)
+
             # request.body 类型为bytes 需解码为str
-            redis_response = g_pubsub.sync_request(channel, request.body.decode(), sync_channel=channel+'res', timeout=10.0)
-            if redis_response is None:
+            ok, redis_response = g_pubsub.sync_request(channel, request.body.decode(), sync_channel=channel+'res', timeout=10.0)
+            if not ok:
                 response['code'] = 1
-                response['msg'] = "Request timeout in redis"
+                if redis_response=="timeout":
+                    response['msg'] = "Timeout in redis"
+                elif redis_response == "offline":
+                    response['msg'] = "Car offline"
+                    car_user[0].is_online = False
+                    car_user[0].save()
             else:
                 redis_response_dict = json.loads(redis_response)
                 ok = redis_response_dict['ok']

@@ -1,4 +1,7 @@
 var tools = {
+    log: false,
+    debug: true,
+
     // 显示消息弹窗
     showMsgToast: function(msg, duration){
         duration = isNaN(duration)?3000:duration;
@@ -29,13 +32,21 @@ var tools = {
 
     // 调试显示
     receive_log: function(str_msg){
+        if(!this.log)
+            return;
         document.querySelector('#receive_log').value += (str_msg + '\n');
         receive_log.scrollTop = receive_log.scrollHeight;
     },
 
     send_log: function(str_msg){
+        if(!this.log)
+            return;
         document.querySelector('#send_log').value += (str_msg + '\n');
         send_log.scrollTop = send_log.scrollHeight;
     },
-
+    console_log: function(msg){
+        if(!this.debug)
+            return;
+        console.log(msg);
+    }
 }

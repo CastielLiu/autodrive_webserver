@@ -30,6 +30,11 @@ class PubSub:
 
         self.pubsub_array = dict()  # 存放新建的私有pubsub以及工作线程[pubsub, thread]
 
+    # 获取通道的订阅者个数
+    def numsub(self, channel):
+        res = self.client.pubsub_numsub(channel)
+        return res[0][1]
+
     # 添加订阅的通道
     def subscribe(self, channel, callback, private_ps=None):
         if private_ps:
@@ -69,6 +74,7 @@ class PubSub:
             if not pubsub.subscribed:  # 无监听通道, 删除监听器pubsub
                 t.stop()  # 停止工作线程
                 t.join()  # 等待线程退出
+                print(self.pubsub_array)
                 self.pubsub_array.pop(private_ps)
         else:
             if _all:
@@ -148,6 +154,9 @@ class PubSub:
     # @param timeout 响应超时时间 float(s)
     def sync_request(self, channel, msg, sync_channel, timeout=0):
         print("sync_request-> channel: %s, sync_channel: %s" % (channel, sync_channel))
+        if self.numsub(channel) < 1:
+            return False, "offline"
+
         request = {'sync': sync_channel, 'timeout': timeout, 'body': msg}
 
         self.sync_cv.acquire()
@@ -155,10 +164,10 @@ class PubSub:
         self.client.publish(channel, json.dumps(request))
         if self.sync_cv.wait(timeout):
             self.sync_cv.release()
-            return self.sync_msg
+            return True, self.sync_msg
 
         self.sync_cv.release()
-        return None
+        return False, "timeout"
 
     # 同步响应
     # @param channel 响应请求的通道

@@ -258,10 +258,10 @@ class CarClientsConsumer(ClientConsumer):
             self.state.longitude = msg.get("lng", None)
             self.state.latitude = msg.get("lat", None)
             self.state.soc = msg.get("soc", -1)
-            self.state.gear = msg.get("soc", 'unknown')
+            self.state.gear = msg.get("gear", 'unknown')
 
-            self.state.mode.set(msg.get("mode", None))
-            self.state.status.set(msg.get("status", 'unknown'))
+            self.state.driverless.set(msg.get("driverless", False))
+            self.state.status.set(msg.get("status", 'x'))
 
             # redis广播车辆状态信息
             g_pubsub.publish(channel=self.car_state_channel, msg=text_data)
@@ -292,7 +292,9 @@ class CarClientsConsumer(ClientConsumer):
         elif msg_type == "rep_taskdone" or \
                 msg_type == "rep_taskfeedback":
             # 转发到web客户端
-            g_pubsub.publish(channel=self.car_state_channel, msg=msg)  # this msg is dict
+            g_pubsub.publish(channel=self.car_state_channel, msg=text_data)
+        elif msg_type == "ping":
+            self.safetySend(json.dumps({"type": "pong"}))
         else:
             print("Unknown msg type: %s!" % msg_type)
 
@@ -484,11 +486,21 @@ def userLoginLogoutInfoCallback(item):
 
 
 def developDebugThread():
-    car_state = {"mode": "Debug", "soc": 15, "speed": 0.0, "gear": 'N', "status": "Debug"}
+    carid = "testcar3"
+    users = CarUser.objects.filter(Q(userid=carid))
+    if len(users) < 1:
+        return
+    car_user = users[0]
+    car_user.is_online = True
+    car_user.save()
+
+    channel = carStateChannel("develop", carid)
+
+    car_state = {"driverless": False, "soc": 15, "speed": 0.0, "gear": 'N', "status": "Debug", "base_ready": True}
     rep_car_state = {"type": "rep_car_state", "data": car_state}
     i = 0
     while True:
-        g_pubsub.publish(channel="develop_car_state_testcar3", msg=rep_car_state, publisher="debug")
+        g_pubsub.publish(channel=channel, msg=rep_car_state, publisher="debug")
         car_state['speed'] = i % 15 + 0.5
         car_state['soc'] = i % 100
         i += 1

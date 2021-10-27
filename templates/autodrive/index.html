@@ -38,7 +38,7 @@
         <input type="button" id="wsTestBtn" value="ws测试" hidden> </input>
 
         <div id="online-cars">
-            车辆列表:  <input type="button" value="刷新" id="flush_online_cars"></input>
+<!--            车辆列表:  <input type="button" value="刷新" id="flush_online_cars"></input>-->
             <div id="cars_list" class="cars_list"></div>
         </div>
         </br>
@@ -76,6 +76,8 @@
             <p>当前车速: <label id="stateCarSpeed"></label></p>
             <p>当前档位: <label id="stateCarGear"></label></p>
             <p>剩余电量: <label id="stateCarSoc"></label></p>
+            <p>系统就绪: <label id="stateBaseReady"></label></p>
+            <p>当前模式: <label id="stateCurrentMode"></label></p>
         </div>
 
 
@@ -97,7 +99,7 @@
         </div>
     </div> <!-- end baidumap_container -->
     <!-- Content -->
-    <div id="other_container">
+    <div id="other_container" hidden>
         <h1 align="center" >调试信息显示窗口</h1>
         <div hidden>
             用户名: <input id="username" type="text" value="" required="required">
@@ -115,7 +117,6 @@
             发送测试数据:</br>
             <input type="text" id="ws_test_data" width="100%"></input></br>
             <button id="wsSendBtn">发送</button>
-
         </div>
     </div><!-- END Content -->
 </div><!-- END Man Container -->
