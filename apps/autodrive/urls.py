@@ -10,6 +10,9 @@ urlpatterns = [
     path('logout/', views.logout_page),
     path('test/', views.test_page),
 
+    path('new/login/', views.new_login),
+
+
     # re_path(r'^upload/(?P<path>.*)$', static.serve, {'document_root': settings.MEDIA_ROOT}, name='static'),
     # 使用自定义serve方法代替django内置方法(django.views.static.serve), 以添加访问权限
     # 由于这里是子路由, document_root需要

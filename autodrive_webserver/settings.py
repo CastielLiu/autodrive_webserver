@@ -170,5 +170,7 @@ SESSION_COOKIE_NAME = "sessionid"  # Session的cookie保存在浏览器上时的
 SESSION_COOKIE_PATH = "/"  # Session的cookie保存的路径（默认）
 SESSION_COOKIE_DOMAIN = None  # Session的cookie保存的域名（默认）
 SESSION_COOKIE_SECURE = False  # 是否Https传输cookie（默认）
-SESSION_COOKIE_HTTPONLY = True  # 是否Session的cookie只支持http传输（默认）
+SESSION_COOKIE_HTTPONLY = False  # 是否Session的cookie只支持http传输（默认True）
 SESSION_SAVE_EVERY_REQUEST = False  # 是否每次请求都保存Session，默认修改之后才保存（默认）
+
+CSRF_COOKIE_HTTPONLY = False  # COOKIE_HTTPONLY为True时, 前端将无法通过js获取cookie信息, 安全性提高

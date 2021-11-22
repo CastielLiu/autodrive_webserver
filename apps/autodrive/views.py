@@ -77,6 +77,19 @@ def check_login(f):
     return inner
 
 
+def new_login(request):
+    if request.method == "GET":
+        # 会话状态已登录，将页面从定向到主页
+        if request.session.get('is_login', False):
+            return redirect("/autodrive/")
+        else:  # 会话状态未登录, render登录页面
+            # 此处务必对session进行修改, 迫使session中间件生成seesion_id(如果不存在)
+            # 如此, 客户端登录成功时才能正确获取session_id并保存
+            request.session['is_login'] = False
+            response = {"csrftoken": "?"}
+
+            return render_login_page(request)
+
 # 进入视图函数之前, request经过了中间件处理, 当请求中的cookie包含SESSION_COOKIE_NAME时,
 # session中间件(如果启用了)将从数据库或其他途径(用户配置)获取保存的session信息
 # request.session将被系统保存, 下次请求时利用SESSION_COOKIE_NAME查找出来
@@ -125,7 +138,9 @@ def login_page(request):
         # request.session.update(login_res)  # 合并字典,取代逐个复制
 
         if usertype == User.WebType:
-            respose = redirect(request.GET.get('next'))
+            # 在前后端分离的登录请求中,可能不包含next参数
+            next_url = request.GET.get('next', "/autodrive/")
+            respose = redirect(next_url)
         else:
             data = {"type": "res_login", "code": 0, "msg": login_res['info']}
             respose = HttpResponse(json.dumps(data))
@@ -179,8 +194,11 @@ def main_page(request):
         response.set_cookie('groupid', usergroupid)
         return response
     # debug_print("http_receive: %s" % str(request.body))
+    try:
+        reqest_body = json.loads(request.body)
+    except json.decoder.JSONDecodeError:
+        return HttpResponse('request fomat invalid!')
 
-    reqest_body = json.loads(request.body)
     req_type = reqest_body.get("type", "")
     data = reqest_body.get("data", {})
 
@@ -291,15 +309,20 @@ def main_page(request):
                     car_user[0].is_online = False
                     car_user[0].save()
             else:
-                redis_response_dict = json.loads(redis_response)
-                ok = redis_response_dict['ok']
-                body = redis_response_dict['body']
-
-                if not ok:  # sync_request请求失败
-                    response['code'] = 1
-                    response['msg'] = redis_response_dict['error_msg']
+                try:
+                    redis_response_dict = json.loads(redis_response)
+                except json.decoder.JSONDecodeError:
+                    response['code'] = 2
+                    response['msg'] = "redis response format error"
                 else:
-                    response_text = body
+                    ok = redis_response_dict['ok']
+                    body = redis_response_dict['body']
+
+                    if not ok:  # sync_request请求失败
+                        response['code'] = 1
+                        response['msg'] = redis_response_dict['error_msg']
+                    else:
+                        response_text = body
             print("req_start_task, response:", redis_response)
     else:
         response['code'] = 1
